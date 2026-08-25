@@ -1,0 +1,7 @@
+{
+  "name": "J.A.R.V.I.S. OS",
+  "description": "Advanced AI Assistant System (Just A Rather Very Intelligent System) inspired by Marvel, featuring autonomous agent reasoning, 3D core orb, voice interface, system control, and secure memory bank.",
+  "requestFramePermissions": ["microphone", "geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+
