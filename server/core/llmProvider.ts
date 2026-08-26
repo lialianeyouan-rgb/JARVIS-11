@@ -112,7 +112,8 @@ async function invokeOllama(context: ConversationContext, toolsAvailable: any[] 
   
   const messages = [
     { role: 'system', content: JARVIS_SYSTEM_PROMPT },
-    ...context.history.map(m => ({
+    // Truncate history to last 3 turns to optimize context window and speed
+    ...context.history.slice(-3).map(m => ({
       role: (m.role === "assistant" || m.role === "model") ? "assistant" : "user",
       content: m.content || (m.parts && m.parts[0]?.text) || ""
     })),
