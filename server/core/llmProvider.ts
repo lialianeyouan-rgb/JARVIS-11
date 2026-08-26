@@ -145,6 +145,7 @@ async function invokeOllama(context: ConversationContext, toolsAvailable: any[] 
         num_ctx: 2048,
         num_predict: 128,
         temperature: 0.7,
+        num_thread: 4,
       }
     })
   });

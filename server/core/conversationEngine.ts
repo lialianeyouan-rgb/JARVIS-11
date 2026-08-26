@@ -29,7 +29,7 @@ export async function processConversation(
     }));
 
   const userTurn = { role: 'user' as const, parts: [{ text: userPrompt }] };
-  const baseContents = [...cleanPastHistory.slice(-8), userTurn];
+  const baseContents = [...cleanPastHistory.slice(-3), userTurn];
 
   const tBeforeLlm1 = Date.now();
   // 2. Invoke LLM with structured history
