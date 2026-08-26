@@ -149,7 +149,7 @@ function resolveOfflineFallbackResponse(prompt: string): { reply: string; toolCa
 
 // Ollama support
 async function invokeOllama(context: ConversationContext, toolsAvailable: any[] | undefined): Promise<LLMResponse> {
-  const model = "llama3.1:8b";
+  const model = process.env.OLLAMA_MODEL || "llama3.2";
   const url = "http://localhost:11434/api/chat";
   
   const messages = [
