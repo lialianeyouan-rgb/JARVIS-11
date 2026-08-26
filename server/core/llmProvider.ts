@@ -140,26 +140,50 @@ async function invokeOllama(context: ConversationContext, toolsAvailable: any[] 
       model,
       messages,
       tools,
-      stream: false,
+      stream: true,
       options: {
         num_ctx: 2048,
-        num_predict: 512,
+        num_predict: 256,
         temperature: 0.7,
       }
     })
   });
   
-  const data = await response.json();
-  
-  const toolCalls = data.message.tool_calls ? data.message.tool_calls.map((tc: any) => ({
-    name: tc.function.name,
-    args: JSON.parse(tc.function.arguments)
-  })) : undefined;
+  if (!response.body) throw new Error("No response body from Ollama");
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let fullReply = "";
+  let finalToolCalls: any[] | undefined = undefined;
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      const chunk = decoder.decode(value, { stream: true });
+      const lines = chunk.split('\n');
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        const parsed = JSON.parse(line);
+        if (parsed.message?.content) {
+          fullReply += parsed.message.content;
+        }
+        if (parsed.message?.tool_calls) {
+          finalToolCalls = parsed.message.tool_calls.map((tc: any) => ({
+            name: tc.function.name,
+            args: JSON.parse(tc.function.arguments)
+          }));
+        }
+      }
+    }
+  } catch (e) {
+    console.error("Streaming error", e);
+  }
 
   return {
     success: true,
-    reply: data.message.content,
-    toolCalls: toolCalls,
+    reply: fullReply,
+    toolCalls: finalToolCalls,
     provider: 'ollama',
     model
   };
