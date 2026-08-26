@@ -26,7 +26,7 @@ export const JARVIS_SYSTEM_PROMPT = `Tu es JARVIS. Assistant technique intellige
 Rôle : Exécution de code, productivité, gestion Workspace/Mac.
 Directives :
 1. Réponse concise, structurée, orientée solution. Pas de bavardage.
-2. Utilise les outils (navigate, configureVoice, Workspace, etc.) UNIQUEMENT sur demande explicite.
+2. Utilise les outils disponibles (navigate, configureVoice, Workspace, etc.) pour automatiser les tâches dès qu'elles sont pertinentes pour la demande de l'utilisateur.
 3. Si sollicité pour changer de voix, utilise 'configureVoice'.
 4. Ton : Professionnel, loyal, efficace.`;
 
@@ -118,6 +118,19 @@ async function invokeOllama(context: ConversationContext, toolsAvailable: any[] 
     })),
     { role: 'user', content: context.userPrompt }
   ];
+
+  const tools = toolsAvailable ? toolsAvailable.map(tool => ({
+    type: "function",
+    function: {
+      name: tool.name,
+      description: tool.description,
+      parameters: {
+        type: "object",
+        properties: tool.parameters.properties,
+        required: tool.parameters.required
+      }
+    }
+  })) : undefined;
   
   const response = await fetch(url, {
     method: 'POST',
@@ -125,6 +138,7 @@ async function invokeOllama(context: ConversationContext, toolsAvailable: any[] 
     body: JSON.stringify({
       model,
       messages,
+      tools,
       stream: false,
       options: {
         num_ctx: 2048,
@@ -135,9 +149,16 @@ async function invokeOllama(context: ConversationContext, toolsAvailable: any[] 
   });
   
   const data = await response.json();
+  
+  const toolCalls = data.message.tool_calls ? data.message.tool_calls.map((tc: any) => ({
+    name: tc.function.name,
+    args: JSON.parse(tc.function.arguments)
+  })) : undefined;
+
   return {
     success: true,
     reply: data.message.content,
+    toolCalls: toolCalls,
     provider: 'ollama',
     model
   };
