@@ -167,7 +167,12 @@ async function invokeOllama(context: ConversationContext, toolsAvailable: any[] 
     body: JSON.stringify({
       model,
       messages,
-      stream: false
+      stream: false,
+      options: {
+        num_ctx: 2048,
+        num_predict: 512,
+        temperature: 0.7,
+      }
     })
   });
   
