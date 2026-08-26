@@ -22,13 +22,7 @@ function getGeminiClient(): GoogleGenAI {
   return aiClient;
 }
 
-export const JARVIS_SYSTEM_PROMPT = `Tu es JARVIS. Assistant technique intelligent, sophistiqué, réactif.
-Rôle : Exécution de code, productivité, gestion Workspace/Mac.
-Directives :
-1. Réponse concise, structurée, orientée solution. Pas de bavardage.
-2. Utilise les outils disponibles (navigate, configureVoice, Workspace, etc.) pour automatiser les tâches dès qu'elles sont pertinentes pour la demande de l'utilisateur.
-3. Si sollicité pour changer de voix, utilise 'configureVoice'.
-4. Ton : Professionnel, loyal, efficace.`;
+export const JARVIS_SYSTEM_PROMPT = `Tu es J.A.R.V.I.S. Assistant technique. Efficacité pure. Pas de bavardage.`;
 
 // Track rate-limited models to avoid repeated 429s during cooldown
 const modelCooldownMap: Map<string, number> = new Map();
@@ -107,13 +101,13 @@ function resolveOfflineFallbackResponse(prompt: string): { reply: string; toolCa
 
 // Ollama support
 async function invokeOllama(context: ConversationContext, toolsAvailable: any[] | undefined): Promise<LLMResponse> {
-  const model = process.env.OLLAMA_MODEL || "llama3.2";
+  const model = process.env.OLLAMA_MODEL || "qwen2.5-coder:1.5b";
   const url = "http://localhost:11434/api/chat";
   
   const messages = [
     { role: 'system', content: JARVIS_SYSTEM_PROMPT },
-    // Truncate history to last 3 turns to optimize context window and speed
-    ...context.history.slice(-3).map(m => ({
+    // Truncate history to last 2 turns to maximize speed
+    ...context.history.slice(-2).map(m => ({
       role: (m.role === "assistant" || m.role === "model") ? "assistant" : "user",
       content: m.content || (m.parts && m.parts[0]?.text) || ""
     })),
@@ -143,9 +137,9 @@ async function invokeOllama(context: ConversationContext, toolsAvailable: any[] 
       stream: true,
       options: {
         num_ctx: 2048,
-        num_predict: 128,
-        temperature: 0.7,
-        num_thread: 4,
+        num_predict: 256,
+        temperature: 0.2, // Lower temperature for faster, more deterministic output
+        num_thread: 8, // Increase threads for Apple Silicon performance
       }
     })
   });

@@ -18,6 +18,20 @@ export async function processConversation(
   googleAccessToken?: string
 ): Promise<ConversationResult> {
   const tStart = Date.now();
+  
+  // Hybrid Router: Bypass LLM for basic actions
+  const p = userPrompt.toLowerCase();
+  if (p.includes("ouvre") || p.includes("open")) {
+    const app = p.replace(/(ouvre|open)/, "").trim();
+    const toolOutput = await executeTool("openMacApplication", { appName: app });
+    return {
+      reply: `Application ${app} ouverte, Maître.`,
+      metrics: { t_backend_total_ms: Date.now() - tStart },
+      modelUsed: "router-bypass",
+      timestamp: new Date().toISOString(),
+    };
+  }
+
   const sessionHistory = memory.getSessionHistory(sessionId);
 
   // 1. Prepare history representation
