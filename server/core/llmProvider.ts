@@ -147,11 +147,44 @@ function resolveOfflineFallbackResponse(prompt: string): { reply: string; toolCa
   };
 }
 
+// Ollama support
+async function invokeOllama(context: ConversationContext, toolsAvailable: any[] | undefined): Promise<LLMResponse> {
+  const model = "llama3.1"; // Or whatever model you pulled
+  const url = "http://localhost:11434/api/generate";
+  
+  // Basic transformation for Ollama (this is simplified)
+  const prompt = context.userPrompt;
+  
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model,
+      prompt: `${JARVIS_SYSTEM_PROMPT}\n\nUser: ${prompt}`,
+      stream: false
+    })
+  });
+  
+  const data = await response.json();
+  return {
+    success: true,
+    reply: data.response,
+    provider: 'ollama',
+    model
+  };
+}
+
 export async function invokeLLM(context: ConversationContext, preferredModel?: string): Promise<LLMResponse> {
   const startTime = Date.now();
-  const provider = "google-gemini";
-  const apiKey = process.env.GEMINI_API_KEY;
+  const provider = process.env.USE_OLLAMA === "true" ? "ollama" : "google-gemini";
+  
+  const toolsAvailable = context.tools || jarvisToolDeclarations;
 
+  if (provider === "ollama") {
+      return await invokeOllama(context, toolsAvailable);
+  }
+
+  const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     throw new Error("LLM_ERROR: GEMINI_API_KEY is not defined in environment.");
   }
@@ -203,13 +236,12 @@ export async function invokeLLM(context: ConversationContext, preferredModel?: s
   // Conditionally bypass tool declarations for simple conversational greetings to cut latency to < 1s
   const lowerPrompt = (context.userPrompt || "").toLowerCase().trim();
   const isConversational = ['bonjour', 'salut', 'coucou', 'ça va', 'comment vas-tu', 'merci', 'hello', 'hi', 'hey', 'super', 'ok', 'au revoir', 'good morning'].some(g => lowerPrompt === g || lowerPrompt.startsWith(g + ' '));
-  const toolsAvailable = isConversational ? undefined : (context.tools || jarvisToolDeclarations);
+  const toolsAvailableForLLM = isConversational ? undefined : toolsAvailable;
 
-  // Active official Gemini models supported in this environment (gemini-3.1-flash-lite prioritized for highest Free-Tier quota & sub-second latency)
+  // Active official Gemini models supported in this environment
   const defaultModels = [
-    "gemini-3.1-flash-lite",
-    "gemini-flash-latest",
-    "gemini-3.7-flash",
+    "gemini-1.5-flash",
+    "gemini-1.5-pro",
   ];
 
   const orderedCandidates = preferredModel && defaultModels.includes(preferredModel)
@@ -232,7 +264,7 @@ export async function invokeLLM(context: ConversationContext, preferredModel?: s
         contents: contentsToSend,
         config: {
           systemInstruction: JARVIS_SYSTEM_PROMPT,
-          tools: toolsAvailable ? [{ functionDeclarations: toolsAvailable }] : undefined,
+          tools: toolsAvailableForLLM ? [{ functionDeclarations: toolsAvailableForLLM }] : undefined,
           temperature: 0.7,
         },
       });
@@ -256,7 +288,7 @@ export async function invokeLLM(context: ConversationContext, preferredModel?: s
           responseTimeMs,
           messageCount: contentsToSend.length,
           roles: contentsToSend.map(h => h.role),
-          toolsAvailableCount: toolsAvailable ? toolsAvailable.length : 0,
+          toolsAvailableCount: toolsAvailableForLLM ? toolsAvailableForLLM.length : 0,
         },
       };
     } catch (err: any) {
@@ -314,12 +346,13 @@ export async function invokeLLM(context: ConversationContext, preferredModel?: s
     toolCalls: fallback.toolCalls,
     rawResponse: lastError,
     provider,
-    model: "gemini-3.1-flash-lite",
+    model: "gemini-1.5-flash",
     metrics: {
       responseTimeMs,
       messageCount: contentsToSend.length,
       roles: contentsToSend.map(h => h.role),
-      toolsAvailableCount: toolsAvailable ? toolsAvailable.length : 0,
+      toolsAvailableCount: toolsAvailableForLLM ? toolsAvailableForLLM.length : 0,
     },
   };
 }
+
