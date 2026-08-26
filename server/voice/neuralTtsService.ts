@@ -52,111 +52,25 @@ export async function synthesizeNeuralSpeech(options: TtsRequestOptions): Promis
     return { success: false, provider: 'fallback_browser', error: 'Texte vide fourni.' };
   }
 
-  // 1. Check ElevenLabs Engine
-  const elevenLabsKey = process.env.ELEVENLABS_API_KEY || 'sk_8ff7a39d568e30fcb754d7baf4ad4e945f7bc154d7c31074';
-  if ((engine === 'elevenlabs' || engine === 'auto') && elevenLabsKey) {
-    try {
-      // Pick voice: jarvis -> George, friday -> Bella, etc.
-      let voiceId = ELEVENLABS_VOICES[voicePreset as keyof typeof ELEVENLABS_VOICES] || ELEVENLABS_VOICES.jarvis;
-      
-      const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
-        method: 'POST',
-        headers: {
-          'Accept': 'audio/mpeg',
-          'Content-Type': 'application/json',
-          'xi-api-key': elevenLabsKey,
-        },
-        body: JSON.stringify({
-          text,
-          model_id: 'eleven_multilingual_v2', // Native French and English neural accent support
-          voice_settings: {
-            stability: stability || 0.70,
-            similarity_boost: 0.85,
-            style: 0.15,
-            use_speaker_boost: true,
-          },
-        }),
-      });
+  // 1. ElevenLabs Engine - Disabled for 100% local operation
+  // const elevenLabsKey = process.env.ELEVENLABS_API_KEY || 'sk_8ff7a39d568e30fcb754d7baf4ad4e945f7bc154d7c31074';
+  // if ((engine === 'elevenlabs' || engine === 'auto') && elevenLabsKey) {
+  //   try {
+  //     // ... existing code ...
+  //   } catch (err: any) {
+  //     console.warn('[TTS] ElevenLabs synthesis failed:', err.message);
+  //   }
+  // }
 
-      if (response.ok) {
-        const arrayBuffer = await response.arrayBuffer();
-        const base64 = Buffer.from(arrayBuffer).toString('base64');
-        return {
-          success: true,
-          provider: 'elevenlabs',
-          audioBase64: `data:audio/mpeg;base64,${base64}`,
-          contentType: 'audio/mpeg',
-          voiceName: `ElevenLabs Multilingual v2 (${voicePreset.toUpperCase()})`,
-        };
-      } else {
-        const errText = await response.text();
-        console.warn(`[TTS] ElevenLabs responded with HTTP ${response.status}:`, errText);
-        // Fallback to Adam if custom ID failed
-        if (voiceId !== 'pNInz6obpgDQGcFmaJgB') {
-          const fallbackRes = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/pNInz6obpgDQGcFmaJgB`, {
-            method: 'POST',
-            headers: {
-              'Accept': 'audio/mpeg',
-              'Content-Type': 'application/json',
-              'xi-api-key': elevenLabsKey,
-            },
-            body: JSON.stringify({
-              text,
-              model_id: 'eleven_multilingual_v2',
-              voice_settings: { stability: 0.70, similarity_boost: 0.80 },
-            }),
-          });
-          if (fallbackRes.ok) {
-            const buf = await fallbackRes.arrayBuffer();
-            return {
-              success: true,
-              provider: 'elevenlabs',
-              audioBase64: `data:audio/mpeg;base64,${Buffer.from(buf).toString('base64')}`,
-              contentType: 'audio/mpeg',
-              voiceName: `ElevenLabs Multilingual v2 (Adam/Jarvis)`,
-            };
-          }
-        }
-      }
-    } catch (err: any) {
-      console.warn('[TTS] ElevenLabs synthesis failed:', err.message);
-    }
-  }
-
-  // 2. Check OpenAI TTS Engine
-  const openAiKey = process.env.OPENAI_API_KEY;
-  if ((engine === 'openai' || engine === 'auto') && openAiKey) {
-    try {
-      const voice = OPENAI_VOICES[voicePreset] || 'onyx';
-      const response = await fetch('https://api.openai.com/v1/audio/speech', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${openAiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'tts-1-hd',
-          input: text,
-          voice: voice,
-          speed: 0.95,
-        }),
-      });
-
-      if (response.ok) {
-        const arrayBuffer = await response.arrayBuffer();
-        const base64 = Buffer.from(arrayBuffer).toString('base64');
-        return {
-          success: true,
-          provider: 'openai',
-          audioBase64: `data:audio/mpeg;base64,${base64}`,
-          contentType: 'audio/mpeg',
-          voiceName: `OpenAI TTS-1-HD (${voice})`,
-        };
-      }
-    } catch (err: any) {
-      console.warn('[TTS] OpenAI TTS failed:', err.message);
-    }
-  }
+  // 2. OpenAI TTS Engine - Disabled for 100% local operation
+  // const openAiKey = process.env.OPENAI_API_KEY;
+  // if ((engine === 'openai' || engine === 'auto') && openAiKey) {
+  //   try {
+  //     // ... existing code ...
+  //   } catch (err: any) {
+  //     console.warn('[TTS] OpenAI TTS failed:', err.message);
+  //   }
+  // }
 
   // 3. Check Local Mac Bridge Neural Engine (Kokoro / Piper on localhost:8765)
   if (engine === 'local_bridge' || engine === 'auto') {
