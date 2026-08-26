@@ -143,7 +143,7 @@ async function invokeOllama(context: ConversationContext, toolsAvailable: any[] 
       stream: true,
       options: {
         num_ctx: 2048,
-        num_predict: 256,
+        num_predict: 128,
         temperature: 0.7,
       }
     })
