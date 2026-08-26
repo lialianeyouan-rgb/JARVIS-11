@@ -29,6 +29,10 @@ export class ConversationMemory {
     this.sessions.delete(sessionId);
   }
 
+  public clearAll(): void {
+    this.sessions.clear();
+  }
+
   public formatHistoryForGemini(messages: Message[]): any[] {
     return messages
       .filter((m) => m.role !== "system")

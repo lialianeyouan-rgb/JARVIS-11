@@ -94,6 +94,7 @@ app.get("/api/test-gemini", async (req, res) => {
 
 // J.A.R.V.I.S. Conversational Endpoint (Strict pipeline without mock fallback)
 app.post("/api/jarvis/chat", async (req, res) => {
+  const startTime = Date.now();
   try {
     const { messages, sessionId = "default", userPrompt: rawPrompt, context, googleAccessToken } = req.body;
     let userPrompt = rawPrompt || "";
@@ -114,6 +115,14 @@ app.post("/api/jarvis/chat", async (req, res) => {
     console.log(`[JARVIS CHAT] Processing session ${sessionId} with prompt: "${userPrompt}"`);
 
     const result = await processConversation(sessionId, userPrompt, token);
+
+    // Monitoring and Self-Cleaning
+    const duration = Date.now() - startTime;
+    if (duration > 20000) {
+      console.log(`[SELF-CLEANING] Système saturé (${duration}ms), auto-nettoyage du cache effectué.`);
+      memory.clearAll();
+    }
+
     return res.json(result);
   } catch (error: any) {
     console.error("[JARVIS CHAT CRITICAL ERROR]:", error);

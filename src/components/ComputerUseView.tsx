@@ -338,11 +338,14 @@ export const ComputerUseView: React.FC = () => {
     fetchScreen();
     fetchCustomBridge();
     const interval = setInterval(() => {
-      fetchStatus();
-      fetchEvents();
-    }, 1500);
+      // Only poll if not currently performing an action to avoid saturating CPU
+      if (!loading) {
+        fetchStatus();
+        fetchEvents();
+      }
+    }, 5000); // Increased interval to 5s
     return () => clearInterval(interval);
-  }, []);
+  }, [loading]);
 
   const handleExecuteIntent = async (intentToRun?: string) => {
     const text = intentToRun || intentInput;

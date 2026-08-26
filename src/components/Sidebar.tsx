@@ -50,7 +50,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, setTab, onClose })
       } catch {}
     };
     checkStatus();
-    const timer = setInterval(checkStatus, 4000);
+    const timer = setInterval(checkStatus, 10000); // Increased to 10s
     return () => clearInterval(timer);
   }, []);
 
