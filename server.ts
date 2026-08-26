@@ -116,12 +116,12 @@ app.post("/api/jarvis/chat", async (req, res) => {
 
     const result = await processConversation(sessionId, userPrompt, token);
 
-    // Monitoring and Self-Cleaning
-    const duration = Date.now() - startTime;
-    if (duration > 20000) {
-      console.log(`[SELF-CLEANING] Système saturé (${duration}ms), auto-nettoyage du cache effectué.`);
-      memory.clearAll();
-    }
+    // Monitoring and Self-Cleaning (DISABLED: Triggering self-cleaning in flight causes race conditions)
+    // const duration = Date.now() - startTime;
+    // if (duration > 20000) {
+    //   console.log(`[SELF-CLEANING] Système saturé (${duration}ms), auto-nettoyage du cache effectué.`);
+    //   memory.clearAll();
+    // }
 
     return res.json(result);
   } catch (error: any) {
