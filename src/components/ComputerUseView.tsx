@@ -338,12 +338,8 @@ export const ComputerUseView: React.FC = () => {
     fetchScreen();
     fetchCustomBridge();
     const interval = setInterval(() => {
-      // Only poll if not currently performing an action to avoid saturating CPU
-      if (!loading) {
-        fetchStatus();
-        fetchEvents();
-      }
-    }, 5000); // Increased interval to 5s
+      // Polling disabled for performance testing
+    }, 999999999); 
     return () => clearInterval(interval);
   }, [loading]);
 

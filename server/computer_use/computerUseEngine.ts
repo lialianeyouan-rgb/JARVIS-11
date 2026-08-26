@@ -11,22 +11,13 @@ class ComputerUseEngine {
   private activePlans: Map<string, ComputerUsePlan> = new Map();
 
   public async planAndExecute(userIntent: string): Promise<ComputerUsePlan> {
+    // MOCK BYPASS: Direct interpretation of intent for testing
+    console.log(`[MOCK BYPASS] Intent received: "${userIntent}"`);
+    
+    // Bypass LLM planning and go straight to plan generation from intent
     let plan = this.createPlanFromIntent(userIntent);
     
-    // If hardcoded logic didn't generate steps, use AI
-    if (plan.steps.length === 0) {
-      try {
-        console.log(`[AI PLANNER] Intent "${userIntent}" unmatched, generating via Gemini...`);
-        const aiPlan = await this.generatePlanWithAI(userIntent);
-        if (aiPlan && aiPlan.length > 0) {
-          plan.steps = aiPlan;
-        }
-      } catch (err) {
-        console.error("[AI PLANNER ERROR]", err);
-      }
-    }
-    
-    // Default fallback if still no steps
+    // Force readScreen as a safety check if no steps found
     if (plan.steps.length === 0) {
       plan.steps.push({
         id: `fallback_${Date.now()}`,
