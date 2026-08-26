@@ -149,18 +149,24 @@ function resolveOfflineFallbackResponse(prompt: string): { reply: string; toolCa
 
 // Ollama support
 async function invokeOllama(context: ConversationContext, toolsAvailable: any[] | undefined): Promise<LLMResponse> {
-  const model = "llama3.1"; // Or whatever model you pulled
-  const url = "http://localhost:11434/api/generate";
+  const model = "llama3.1:8b";
+  const url = "http://localhost:11434/api/chat";
   
-  // Basic transformation for Ollama (this is simplified)
-  const prompt = context.userPrompt;
+  const messages = [
+    { role: 'system', content: JARVIS_SYSTEM_PROMPT },
+    ...context.history.map(m => ({
+      role: (m.role === "assistant" || m.role === "model") ? "assistant" : "user",
+      content: m.content || (m.parts && m.parts[0]?.text) || ""
+    })),
+    { role: 'user', content: context.userPrompt }
+  ];
   
   const response = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       model,
-      prompt: `${JARVIS_SYSTEM_PROMPT}\n\nUser: ${prompt}`,
+      messages,
       stream: false
     })
   });
@@ -168,7 +174,7 @@ async function invokeOllama(context: ConversationContext, toolsAvailable: any[] 
   const data = await response.json();
   return {
     success: true,
-    reply: data.response,
+    reply: data.message.content,
     provider: 'ollama',
     model
   };
