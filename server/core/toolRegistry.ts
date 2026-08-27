@@ -416,28 +416,7 @@ export const jarvisToolDeclarations: any[] = [
       required: ["draftId", "confirmed"],
     },
   },
-  {
-    name: "createGoogleDoc",
-    description: "Create a new Google Doc.",
-    parameters: {
-      type: "OBJECT",
-      properties: {
-        title: { type: "STRING", description: "Document title" },
-      },
-      required: ["title"],
-    },
-  },
-  {
-    name: "createGoogleSheet",
-    description: "Create a new Google Sheet.",
-    parameters: {
-      type: "OBJECT",
-      properties: {
-        title: { type: "STRING", description: "Sheet title" },
-      },
-      required: ["title"],
-    },
-  },
+
   {
     name: "listDriveFiles",
     description: "List files in Google Drive.",

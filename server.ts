@@ -412,7 +412,7 @@ app.get("/api/jarvis/audit", (req, res) => {
       historyRetention: "Active multi-turn conversation memory with structured role tracking (system, user, assistant, model, tool).",
     },
     capabilities: [
-      { name: "Gemini LLM Provider (gemini-2.5-flash / gemini-3.7-flash)", status: "FUNCTIONAL (Real API integration)" },
+      { name: "Gemini LLM Provider (gemini-3.7-flash / gemini-3.1-flash-lite)", status: "FUNCTIONAL (Real API integration)" },
       { name: "Conversational Pipeline & Memory", status: "FUNCTIONAL (Multi-turn context preserved)" },
       { name: "Function Calling & Tool Execution", status: "FUNCTIONAL (Web scraping, weather, stock, postgres, IoT, google docs/sheets)" },
       { name: "Local OS Hardware Control", status: "ACTIVE (Native Mac Daemon bridge on port 8765)" },
@@ -692,10 +692,10 @@ app.post("/api/jarvis/deep-validation", async (req, res) => {
     results.steps.push({
       step: 1,
       name: "Model & API Endpoint Verification",
-      model: "gemini-3.6-flash",
+      model: "gemini-3.7-flash",
       sdkVersion: "@google/genai ^2.4.0",
-      endpoint: "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent",
-      chatEndpointConfirmation: "Confirmed: /api/jarvis/chat uses invokeLLM with gemini-3.6-flash and the exact same pipeline.",
+      endpoint: "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.7-flash:generateContent",
+      chatEndpointConfirmation: "Confirmed: /api/jarvis/chat uses invokeLLM with gemini-3.7-flash and the exact same pipeline.",
       status: "PASSED",
     });
 

@@ -102,7 +102,14 @@ export const GoogleWorkspaceAuditModal: React.FC<GoogleWorkspaceAuditModalProps>
         await runAudit();
       }
     } catch (err: any) {
-      console.error('Google Sign In Failed:', err);
+      if (
+        err?.code === 'auth/popup-closed-by-user' ||
+        err?.code === 'auth/cancelled-popup-request' ||
+        err?.message?.includes('popup-closed-by-user')
+      ) {
+        return;
+      }
+      console.warn('Google Sign In incomplete:', err?.message || err);
     } finally {
       setConnecting(false);
     }

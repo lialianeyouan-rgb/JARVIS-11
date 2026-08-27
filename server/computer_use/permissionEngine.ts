@@ -35,6 +35,13 @@ class PermissionEngine {
     'notes',
     'calendar',
     'calculator',
+    'whatsapp',
+    'textedit',
+    'preview',
+    'maps',
+    'pages',
+    'keynote',
+    'numbers',
     'settings',
     'system preferences',
   ]);

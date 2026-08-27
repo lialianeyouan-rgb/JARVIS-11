@@ -101,6 +101,7 @@ function resolveOfflineFallbackResponse(prompt: string): { reply: string; toolCa
 
 // Ollama support
 async function invokeOllama(context: ConversationContext, toolsAvailable: any[] | undefined): Promise<LLMResponse> {
+  const startTime = Date.now();
   const model = process.env.OLLAMA_MODEL || "qwen2.5-coder:1.5b";
   const url = "http://localhost:11434/api/chat";
   
@@ -180,7 +181,13 @@ async function invokeOllama(context: ConversationContext, toolsAvailable: any[] 
     reply: fullReply,
     toolCalls: finalToolCalls,
     provider: 'ollama',
-    model
+    model,
+    metrics: {
+      responseTimeMs: Date.now() - startTime,
+      messageCount: messages.length,
+      roles: messages.map(m => m.role),
+      toolsAvailableCount: tools ? tools.length : 0,
+    },
   };
 }
 
@@ -250,8 +257,8 @@ export async function invokeLLM(context: ConversationContext, preferredModel?: s
 
   // Active official Gemini models supported in this environment
   const defaultModels = [
-    "gemini-1.5-flash",
-    "gemini-1.5-pro",
+    "gemini-3.7-flash",
+    "gemini-3.1-flash-lite",
   ];
 
   const orderedCandidates = preferredModel && defaultModels.includes(preferredModel)
@@ -356,7 +363,7 @@ export async function invokeLLM(context: ConversationContext, preferredModel?: s
     toolCalls: fallback.toolCalls,
     rawResponse: lastError,
     provider,
-    model: "gemini-1.5-flash",
+    model: "gemini-3.7-flash",
     metrics: {
       responseTimeMs,
       messageCount: contentsToSend.length,

@@ -58,6 +58,13 @@ export async function processConversation(
   const llmFirstMs = tAfterLlm1 - tBeforeLlm1;
 
   let finalReply = llmResult.reply || "";
+  
+  // Clean up JSON/Code block noise from the LLM reply
+  finalReply = finalReply
+    .replace(/```json\s*\{[\s\S]*?\}\s*```/g, "")
+    .replace(/```[\s\S]*?```/g, "")
+    .trim();
+
   let executedToolInfo: { tool: string; result: any } | undefined = undefined;
   let toolExecMs = 0;
   let llmFollowupMs = 0;

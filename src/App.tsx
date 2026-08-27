@@ -155,8 +155,16 @@ export default function App() {
         setGoogleUserEmail(res.user.email);
         setHasGoogleToken(true);
       }
-    } catch (e) {
-      console.error('Quick Google Connect failed:', e);
+    } catch (e: any) {
+      if (
+        e?.code === 'auth/popup-closed-by-user' ||
+        e?.code === 'auth/cancelled-popup-request' ||
+        e?.message?.includes('popup-closed-by-user')
+      ) {
+        // User closed popup intentionally
+        return;
+      }
+      console.warn('Quick Google Connect incomplete:', e?.message || e);
       setIsGoogleAuditOpen(true);
     } finally {
       setIsConnectingGoogle(false);

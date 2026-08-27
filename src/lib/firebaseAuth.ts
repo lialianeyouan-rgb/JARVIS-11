@@ -112,7 +112,17 @@ export const googleSignIn = async (): Promise<{ user: User; accessToken: string 
 
     return { user: result.user, accessToken: cachedAccessToken };
   } catch (error: any) {
-    console.error('Google Sign In error:', error);
+    if (
+      error?.code === 'auth/popup-closed-by-user' ||
+      error?.code === 'auth/cancelled-popup-request' ||
+      error?.code === 'auth/popup-blocked' ||
+      error?.message?.includes('popup-closed-by-user') ||
+      error?.message?.includes('cancelled-popup-request')
+    ) {
+      console.info('Connexion Google interrompue ou fermée par l\'utilisateur.');
+      return null;
+    }
+    console.warn('Google Sign In warning:', error?.message || error);
     throw error;
   } finally {
     isSigningIn = false;
