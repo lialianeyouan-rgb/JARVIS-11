@@ -7,8 +7,8 @@
     
     <key>ProgramArguments</key>
     <array>
-        <!-- On utilise python3 (l'utilisateur devra modifier ce chemin s'il utilise un env virtuel spécifique) -->
-        <string>/usr/bin/python3</string>
+        <!-- Utilisation explicite de Python 3.14 -->
+        <string>/Library/Frameworks/Python.framework/Versions/3.14/bin/python3</string>
         <string>TARGET_DIR/jarvis_device_agent.py</string>
     </array>
     
