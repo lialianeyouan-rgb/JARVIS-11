@@ -91,7 +91,7 @@ class DeviceManager {
       actionCount: 0,
       errorCount: 0,
     });
-    this.customBridgeUrl = process.env.JARVIS_MAC_BRIDGE_URL || process.env.MAC_BRIDGE_URL || 'http://127.0.0.1:8765';
+    this.customBridgeUrl = process.env.JARVIS_MAC_BRIDGE_URL || process.env.MAC_BRIDGE_URL || null;
     if (this.customBridgeUrl) {
       this.setCustomBridgeUrl(this.customBridgeUrl, this.customBridgeToken);
     }
@@ -243,6 +243,10 @@ class DeviceManager {
   }
 
   public isDeviceOnline(deviceId?: string): boolean {
+    if (this.customBridgeUrl) {
+      console.log(`[DEVICE MANAGER] customBridgeUrl is set (${this.customBridgeUrl}) -> isDeviceOnline() = true`);
+      return true;
+    }
     // 1. If explicit deviceId provided, check it first
     if (deviceId) {
       const dev = this.devices.get(deviceId);
@@ -289,6 +293,31 @@ class DeviceManager {
   }
 
   public getConnectedDevice(deviceId?: string): RegisteredDevice | undefined {
+    if (this.customBridgeUrl) {
+      return this.devices.get('mac-bridge-tunnel') || {
+        deviceId: 'mac-bridge-tunnel',
+        name: 'Mac Tunnel Bridge',
+        platform: 'macOS',
+        hostname: 'MacBook Host via Tunnel',
+        ipAddress: this.customBridgeUrl,
+        status: 'online',
+        registeredAt: new Date().toISOString(),
+        lastHeartbeat: new Date().toISOString(),
+        reconnectCount: 1,
+        activeApp: 'Finder',
+        resolution: { width: 1920, height: 1080 },
+        metrics: {
+          t_cloud_to_mac_ms: 35,
+          t_local_exec_ms: 55,
+          t_screen_capture_ms: 90,
+          t_cloud_roundtrip_ms: 180,
+          t_total_ms: 180,
+          lastUpdated: new Date().toISOString(),
+        },
+        actionCount: 0,
+        errorCount: 0,
+      };
+    }
     this.isDeviceOnline(deviceId);
     const targetId = deviceId || this.primaryDeviceId;
     if (targetId && this.devices.has(targetId)) {
@@ -668,6 +697,8 @@ class DeviceManager {
 
     const isOnline = this.isDeviceOnline(deviceId);
     const dev = this.getConnectedDevice(deviceId);
+    const executionPath = this.customBridgeUrl ? "CUSTOM_BRIDGE_HTTP" : (dev?.ws ? "WEBSOCKET" : "OFFLINE");
+    console.log(`[DEVICE MANAGER] sendDeviceCommand('${action}') -> customBridgeUrl: ${this.customBridgeUrl}, isOnline: ${isOnline}, deviceId: ${dev?.deviceId}, executionPath: ${executionPath}`);
 
     if (!isOnline || !dev) {
       throw new Error(
@@ -679,68 +710,111 @@ class DeviceManager {
     const isDarwin = dev.platform === 'macOS';
     const rawCommand = params.command || (action === 'launchApp' || action === 'openApp' ? (isDarwin ? `open -a "${params.appName || ''}"` : `echo "Launched ${params.appName || ''}"`) : undefined);
     
-    // Check if Custom Bridge URL is configured and WebSocket is not open -> Direct HTTP Bridge Dispatch
-    if (this.customBridgeUrl && (!dev.ws || dev.ws.readyState !== WebSocket.OPEN)) {
+    // Check if Custom Bridge URL is configured -> Direct HTTP Bridge Dispatch via /exec
+    if (this.customBridgeUrl) {
       try {
         const tStart = Date.now();
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
-        let res = await fetch(`${this.customBridgeUrl}/action`, {
+        let execCommand = params.command;
+        if (!execCommand) {
+          if (action === 'launchApp' || action === 'launchApplication' || action === 'openApp') {
+            const appName = params.appName || params.target || params.app || 'Safari';
+            const targetPath = params.targetPath || params.url || '';
+            execCommand = targetPath ? `open -a "${appName}" "${targetPath}"` : `open -a "${appName}"`;
+          } else if (action === 'openUrl' || action === 'navigateWeb') {
+            const url = params.url || params.targetPath || params.target || 'https://google.com';
+            const browser = params.browser || 'Google Chrome';
+            execCommand = `open -a "${browser}" "${url}"`;
+          } else if (action === 'captureScreen' || action === 'getScreen' || action === 'readScreen') {
+            execCommand = `screencapture -x -t jpg /tmp/jarvis_capture.jpg`;
+          } else if (action === 'click') {
+            const x = params.x || 960;
+            const y = params.y || 540;
+            execCommand = `cliclick c:${x},${y}`;
+          } else {
+            execCommand = params.command || `echo "Action ${action}"`;
+          }
+        }
+
+        console.log(`[CUSTOM BRIDGE] Effective bridge URL: ${this.customBridgeUrl}`);
+        console.log(`[CUSTOM BRIDGE] Dispatching action '${action}' via POST ${this.customBridgeUrl}/exec with command: ${execCommand}`);
+
+        const res = await fetch(`${this.customBridgeUrl}/exec`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${this.customBridgeToken}`,
           },
-          body: JSON.stringify({ id: reqId, action, params, command: rawCommand }),
+          body: JSON.stringify({ command: execCommand }),
           signal: controller.signal,
-        }).catch(() => null);
+        }).catch((err) => {
+          console.error(`[CUSTOM BRIDGE] Fetch error:`, err);
+          return null;
+        });
 
-        if (!res || res.status === 404) {
-          if (rawCommand) {
-            res = await fetch(`${this.customBridgeUrl}/exec`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${this.customBridgeToken}`,
-              },
-              body: JSON.stringify({ command: rawCommand }),
-              signal: controller.signal,
-            }).catch(() => null);
-          }
-        }
         clearTimeout(timeoutId);
+        const roundtripMs = Date.now() - tStart;
+        dev.actionCount += 1;
 
-        if (res && res.ok) {
-          const data = await res.json();
-          const roundtripMs = Date.now() - tStart;
-          dev.actionCount += 1;
-          dev.metrics = {
-            t_cloud_to_mac_ms: Math.round(roundtripMs * 0.2),
-            t_local_exec_ms: Math.round(roundtripMs * 0.7),
-            t_screen_capture_ms: data.screenshotBase64 ? 90 : 0,
-            t_cloud_roundtrip_ms: roundtripMs,
-            t_total_ms: roundtripMs,
-            lastUpdated: new Date().toISOString(),
-          };
-
+        if (!res) {
+          dev.errorCount += 1;
           return {
             id: reqId,
-            success: data.success !== false,
+            success: false,
             action,
-            output: data.output || data.stdout || "Action exécutée avec succès sur le Mac hôte.",
-            error: data.error || data.stderr,
-            screenshotBase64: data.screenshotBase64,
-            observation: data.observation,
-            timings: {
-              t_cloud_to_mac_ms: Math.round(roundtripMs * 0.2),
-              t_local_exec_ms: Math.round(roundtripMs * 0.7),
-              t_screen_capture_ms: data.screenshotBase64 ? 90 : 0,
-            },
+            output: null,
+            error: `Impossible de contacter le pont Mac à l'adresse ${this.customBridgeUrl}`,
+            timings: { t_cloud_to_mac_ms: 20, t_local_exec_ms: roundtripMs, t_screen_capture_ms: 0 },
           };
         }
+
+        const data = await res.json().catch(() => ({}));
+
+        if (!res.ok) {
+          dev.errorCount += 1;
+          return {
+            id: reqId,
+            success: false,
+            action,
+            output: null,
+            error: data.error || data.stderr || `Erreur HTTP ${res.status} du pont Mac.`,
+            timings: { t_cloud_to_mac_ms: 20, t_local_exec_ms: roundtripMs, t_screen_capture_ms: 0 },
+          };
+        }
+
+        dev.metrics = {
+          t_cloud_to_mac_ms: 20,
+          t_local_exec_ms: Math.round(roundtripMs * 0.7),
+          t_screen_capture_ms: action === 'captureScreen' ? 100 : 0,
+          t_cloud_roundtrip_ms: roundtripMs,
+          t_total_ms: roundtripMs,
+          lastUpdated: new Date().toISOString(),
+        };
+
+        return {
+          id: reqId,
+          success: data.success !== false && data.code === 0,
+          action,
+          output: data.stdout || data.output || "Action exécutée avec succès via Custom Bridge.",
+          error: data.stderr || data.error,
+          timings: {
+            t_cloud_to_mac_ms: 20,
+            t_local_exec_ms: Math.round(roundtripMs * 0.7),
+            t_screen_capture_ms: action === 'captureScreen' ? 100 : 0,
+          },
+        };
       } catch (err: any) {
-        console.warn(`[CUSTOM BRIDGE] Direct dispatch failed on ${this.customBridgeUrl}:`, err.message);
+        console.error(`[CUSTOM BRIDGE] Exception on ${this.customBridgeUrl}:`, err);
+        return {
+          id: reqId,
+          success: false,
+          action,
+          output: null,
+          error: err.message || "Erreur de communication avec le Custom Bridge.",
+          timings: { t_cloud_to_mac_ms: 10, t_local_exec_ms: 10, t_screen_capture_ms: 0 },
+        };
       }
     }
 

@@ -14,7 +14,9 @@ AUTH_TOKEN = os.environ.get("JARVIS_BRIDGE_TOKEN", "jarvis-secure-mac-token-2026
 
 # Strict Whitelist of allowed command patterns for Computer Use
 WHITELIST_PATTERNS = [
-    r'^open -a "(Visual Studio Code|Google Chrome|Safari|Terminal|Finder|Spotify|WhatsApp|Instagram|TikTok|Facebook|Discord|Slack)"(\s+".*")?$',
+    r'^open -a "(Visual Studio Code|Google Chrome|Safari|Terminal|Finder|Spotify|WhatsApp|Instagram|TikTok|Facebook|Discord|Slack|Calculator|Notes|TextEdit|Calendar)"(\s+".*")?$',
+    r'^screencapture\s+.*$',
+    r'^cliclick\s+.*$',
     r'^npm run dev$',
     r'^git status$',
     r'^echo\s+.*$',

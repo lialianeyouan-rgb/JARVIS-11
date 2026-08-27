@@ -24,7 +24,7 @@ export class LocalBridgeClient {
       throw new Error("Opération rejetée : Arrêt d'urgence actif.");
     }
     if (!this.isOnline()) {
-      throw new Error("Le Mac n'est pas connecté. Veuillez lancer le script Python sur votre machine locale.");
+      throw new Error("Le Mac n'est pas connecté. Veuillez configurer l'URL de votre pont (ex: Cloudflare) dans l'onglet 'Pont Mac' de l'interface, ou lancez l'agent Python localement.");
     }
   }
 

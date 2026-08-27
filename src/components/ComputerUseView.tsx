@@ -490,6 +490,7 @@ export const ComputerUseView: React.FC = () => {
   };
 
   const quickIntents = [
+    "Ouvre Safari",
     "Ouvre Google Chrome, va sur LinkedIn et prépare une recherche",
     "Ouvre WhatsApp et prépare l'envoi d'un message",
     "Ouvre VS Code et prépare l'espace de travail",
@@ -606,6 +607,12 @@ export const ComputerUseView: React.FC = () => {
               className="px-3 py-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/50 text-emerald-300 rounded text-xs font-bold transition-all whitespace-nowrap"
             >
               TEST RAPIDE : OUVRIR CHROME
+            </button>
+            <button
+              onClick={() => handleExecutePrimitive('launchApp', 'Safari')}
+              className="px-3 py-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/50 text-emerald-300 rounded text-xs font-bold transition-all whitespace-nowrap"
+            >
+              TEST RAPIDE : OUVRIR SAFARI
             </button>
           </div>
         </div>
