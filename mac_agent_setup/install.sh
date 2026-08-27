@@ -6,16 +6,26 @@
 echo "🤖 Préparation de l'installation des agents J.A.R.V.I.S. sur votre Mac..."
 
 # Définition des chemins
-TARGET_DIR=$(pwd)
+# Utilisation d'un répertoire stable pour éviter les problèmes de permissions sur ~/Downloads
+STABLE_DIR="$HOME/Library/Application Support/Jarvis"
 PLIST_BRIDGE="com.jarvis.macbridge.plist"
 PLIST_TUNNEL="com.jarvis.cloudflared.plist"
 LAUNCH_AGENTS_DIR="$HOME/Library/LaunchAgents"
 
-# Remplacement de TARGET_DIR dans les fichiers .plist avec le dossier actuel
-echo "📝 Configuration des chemins absolus vers le répertoire courant : $TARGET_DIR"
+echo "📂 Création du répertoire stable : $STABLE_DIR"
+mkdir -p "$STABLE_DIR"
 
-sed "s|TARGET_DIR|$TARGET_DIR|g" com.jarvis.macbridge.plist > /tmp/$PLIST_BRIDGE
-sed "s|TARGET_DIR|$TARGET_DIR|g" com.jarvis.cloudflared.plist > /tmp/$PLIST_TUNNEL
+# Copie des scripts vers le répertoire stable
+echo "📂 Copie des fichiers de configuration vers $STABLE_DIR"
+cp ../jarvis_device_agent.py "$STABLE_DIR/"
+cp jarvis_tunnel_manager.sh "$STABLE_DIR/"
+chmod +x "$STABLE_DIR/jarvis_tunnel_manager.sh"
+
+# Remplacement de TARGET_DIR dans les fichiers .plist avec le dossier stable
+echo "📝 Configuration des chemins absolus vers le répertoire stable : $STABLE_DIR"
+
+sed "s|TARGET_DIR|$STABLE_DIR|g" "$PLIST_BRIDGE" > /tmp/$PLIST_BRIDGE
+sed "s|TARGET_DIR|$STABLE_DIR|g" "$PLIST_TUNNEL" > /tmp/$PLIST_TUNNEL
 
 # Copie des fichiers vers LaunchAgents
 echo "📂 Copie des fichiers de configuration vers $LAUNCH_AGENTS_DIR"
