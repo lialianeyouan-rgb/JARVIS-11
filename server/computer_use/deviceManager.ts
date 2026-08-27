@@ -2,6 +2,7 @@ import { WebSocket, WebSocketServer } from 'ws';
 import { IncomingMessage } from 'http';
 import { DeviceStatus, ScreenObservation } from './types';
 import { computerUseLogger } from './eventLogger';
+import { loadConfig, saveConfig } from './configStore';
 
 export interface DeviceTimingMetrics {
   t_cloud_to_mac_ms: number;
@@ -92,6 +93,15 @@ class DeviceManager {
       errorCount: 0,
     });
     this.customBridgeUrl = process.env.JARVIS_MAC_BRIDGE_URL || process.env.MAC_BRIDGE_URL || null;
+    
+    const config = loadConfig();
+    if (config.customBridgeUrl) {
+      this.customBridgeUrl = config.customBridgeUrl;
+    }
+    if (config.customBridgeToken) {
+      this.customBridgeToken = config.customBridgeToken;
+    }
+
     if (this.customBridgeUrl) {
       this.setCustomBridgeUrl(this.customBridgeUrl, this.customBridgeToken);
     }
@@ -105,13 +115,15 @@ class DeviceManager {
     this.pairingSecret = newSecret;
   }
 
-  private customBridgeUrl: string | null = process.env.JARVIS_MAC_BRIDGE_URL || process.env.MAC_BRIDGE_URL || null;
-  private customBridgeToken: string = process.env.JARVIS_MAC_BRIDGE_TOKEN || process.env.MAC_BRIDGE_TOKEN || process.env.JARVIS_DEVICE_SECRET || 'jarvis-secure-mac-token-2026';
+  private customBridgeUrl: string | null = null;
+  private customBridgeToken: string = 'jarvis-secure-mac-token-2026';
 
   public setCustomBridgeUrl(url: string | null, token?: string): void {
     if (url && url.trim()) {
       this.customBridgeUrl = url.trim().replace(/\/+$/, '');
       if (token) this.customBridgeToken = token;
+      
+      saveConfig({ customBridgeUrl: this.customBridgeUrl, customBridgeToken: this.customBridgeToken });
       
       // Register or update device record for this bridge tunnel
       const deviceId = 'mac-bridge-tunnel';
@@ -182,6 +194,8 @@ class DeviceManager {
       if (res && (res.ok || res.status === 401 || res.status === 200)) {
         const latencyMs = Date.now() - tStart;
         this.setCustomBridgeUrl(targetUrl);
+        const tunnelDev = this.devices.get('mac-bridge-tunnel');
+        if (tunnelDev) tunnelDev.lastHeartbeat = new Date().toISOString();
         return {
           success: true,
           url: targetUrl,
@@ -200,6 +214,8 @@ class DeviceManager {
       if (rootRes) {
         const latencyMs = Date.now() - tStart;
         this.setCustomBridgeUrl(targetUrl);
+        const tunnelDev = this.devices.get('mac-bridge-tunnel');
+        if (tunnelDev) tunnelDev.lastHeartbeat = new Date().toISOString();
         return {
           success: true,
           url: targetUrl,
@@ -243,20 +259,21 @@ class DeviceManager {
   }
 
   public isDeviceOnline(deviceId?: string): boolean {
+    let checkId = deviceId;
     if (this.customBridgeUrl) {
-      console.log(`[DEVICE MANAGER] customBridgeUrl is set (${this.customBridgeUrl}) -> isDeviceOnline() = true`);
-      return true;
+      checkId = 'mac-bridge-tunnel';
     }
-    // 1. If explicit deviceId provided, check it first
-    if (deviceId) {
-      const dev = this.devices.get(deviceId);
+
+    // 1. If explicit deviceId provided (or we forced mac-bridge-tunnel), check it first
+    if (checkId) {
+      const dev = this.devices.get(checkId);
       if (dev) {
         const isWsOpen = Boolean(dev.ws && dev.ws.readyState === WebSocket.OPEN);
         const lastHbTime = new Date(dev.lastHeartbeat || 0).getTime();
-        const isRecentlyActive = (Date.now() - lastHbTime) < 60000; // 60 seconds window for HTTP polling
+        const isRecentlyActive = (Date.now() - lastHbTime) < 90000; // 90 seconds window for HTTP polling
         if (isWsOpen || isRecentlyActive) {
           dev.status = 'online';
-          this.primaryDeviceId = deviceId;
+          this.primaryDeviceId = checkId;
           return true;
         } else {
           dev.status = 'offline';
@@ -691,6 +708,7 @@ class DeviceManager {
     timeoutMs: number = 35000,
     deviceId?: string
   ): Promise<DeviceActionResponse> {
+    console.log(`[ACTION RECEIVED] sendDeviceCommand('${action}')`);
     if (this.isEmergencyStopped) {
       throw new Error("Opération rejetée : Arrêt d'urgence actif sur J.A.R.V.I.S.");
     }
@@ -698,7 +716,8 @@ class DeviceManager {
     const isOnline = this.isDeviceOnline(deviceId);
     const dev = this.getConnectedDevice(deviceId);
     const executionPath = this.customBridgeUrl ? "CUSTOM_BRIDGE_HTTP" : (dev?.ws ? "WEBSOCKET" : "OFFLINE");
-    console.log(`[DEVICE MANAGER] sendDeviceCommand('${action}') -> customBridgeUrl: ${this.customBridgeUrl}, isOnline: ${isOnline}, deviceId: ${dev?.deviceId}, executionPath: ${executionPath}`);
+    console.log(`[DEVICE SELECTED] deviceId: ${dev?.deviceId}, isOnline: ${isOnline}, executionPath: ${executionPath}`);
+    console.log(`[CUSTOM BRIDGE DETECTED] this.customBridgeUrl is: ${this.customBridgeUrl}`);
 
     if (!isOnline || !dev) {
       throw new Error(
@@ -738,8 +757,8 @@ class DeviceManager {
           }
         }
 
-        console.log(`[CUSTOM BRIDGE] Effective bridge URL: ${this.customBridgeUrl}`);
-        console.log(`[CUSTOM BRIDGE] Dispatching action '${action}' via POST ${this.customBridgeUrl}/exec with command: ${execCommand}`);
+        console.log(`[EFFECTIVE BRIDGE URL] ${this.customBridgeUrl}`);
+        console.log(`[HTTP REQUEST START] POST ${this.customBridgeUrl}/exec with command: ${execCommand}`);
 
         const res = await fetch(`${this.customBridgeUrl}/exec`, {
           method: 'POST',
@@ -758,9 +777,11 @@ class DeviceManager {
         const roundtripMs = Date.now() - tStart;
         dev.actionCount += 1;
 
+        console.log(`[HTTP RESPONSE RECEIVED] ms: ${roundtripMs}, ok: ${res?.ok}, status: ${res?.status}`);
+
         if (!res) {
           dev.errorCount += 1;
-          return {
+          const errRes = {
             id: reqId,
             success: false,
             action,
@@ -768,13 +789,15 @@ class DeviceManager {
             error: `Impossible de contacter le pont Mac à l'adresse ${this.customBridgeUrl}`,
             timings: { t_cloud_to_mac_ms: 20, t_local_exec_ms: roundtripMs, t_screen_capture_ms: 0 },
           };
+          console.log(`[COMMAND RESULT] FAILED: ${errRes.error}`);
+          return errRes;
         }
 
         const data = await res.json().catch(() => ({}));
 
         if (!res.ok) {
           dev.errorCount += 1;
-          return {
+          const errRes = {
             id: reqId,
             success: false,
             action,
@@ -782,6 +805,8 @@ class DeviceManager {
             error: data.error || data.stderr || `Erreur HTTP ${res.status} du pont Mac.`,
             timings: { t_cloud_to_mac_ms: 20, t_local_exec_ms: roundtripMs, t_screen_capture_ms: 0 },
           };
+          console.log(`[COMMAND RESULT] FAILED HTTP: ${errRes.error}`);
+          return errRes;
         }
 
         dev.metrics = {
@@ -793,7 +818,7 @@ class DeviceManager {
           lastUpdated: new Date().toISOString(),
         };
 
-        return {
+        const successRes = {
           id: reqId,
           success: data.success !== false && data.code === 0,
           action,
@@ -804,10 +829,14 @@ class DeviceManager {
             t_local_exec_ms: Math.round(roundtripMs * 0.7),
             t_screen_capture_ms: action === 'captureScreen' ? 100 : 0,
           },
+          observation: data.observation,
+          screenshotBase64: data.screenshotBase64,
         };
+        console.log(`[COMMAND RESULT] SUCCESS via HTTP`);
+        return successRes;
       } catch (err: any) {
         console.error(`[CUSTOM BRIDGE] Exception on ${this.customBridgeUrl}:`, err);
-        return {
+        const errRes = {
           id: reqId,
           success: false,
           action,
@@ -815,9 +844,12 @@ class DeviceManager {
           error: err.message || "Erreur de communication avec le Custom Bridge.",
           timings: { t_cloud_to_mac_ms: 10, t_local_exec_ms: 10, t_screen_capture_ms: 0 },
         };
+        console.log(`[COMMAND RESULT] EXCEPTION: ${errRes.error}`);
+        return errRes;
       }
     }
 
+    console.log(`[FALLBACK TO WEBSOCKET/POLLING] No customBridgeUrl found!`);
     const payload = {
       id: reqId,
       type: 'EXEC_ACTION',

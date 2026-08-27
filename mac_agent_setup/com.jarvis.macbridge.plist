@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.jarvis.macbridge</string>
+    
+    <key>ProgramArguments</key>
+    <array>
+        <!-- On utilise python3 (l'utilisateur devra modifier ce chemin s'il utilise un env virtuel spécifique) -->
+        <string>/usr/bin/python3</string>
+        <string>TARGET_DIR/jarvis_device_agent.py</string>
+    </array>
+    
+    <!-- Permet au script d'utiliser le bon dossier de travail -->
+    <key>WorkingDirectory</key>
+    <string>TARGET_DIR</string>
+
+    <key>RunAtLoad</key>
+    <true/>
+    
+    <!-- Redémarre automatiquement le script s'il plante -->
+    <key>KeepAlive</key>
+    <true/>
+    
+    <key>StandardOutPath</key>
+    <string>/tmp/jarvis_macbridge.out.log</string>
+    
+    <key>StandardErrorPath</key>
+    <string>/tmp/jarvis_macbridge.err.log</string>
+</dict>
+</plist>

@@ -455,15 +455,6 @@ export async function executeTool(name: string, args: any): Promise<any> {
         timestamp: new Date().toISOString(),
       };
     }
-    case "sendEmail": {
-      return {
-        success: true,
-        recipient: args.recipient,
-        subject: args.subject,
-        status: `E-mail transmis avec succès à ${args.recipient} via le pont SMTP / Gmail API.`,
-        timestamp: new Date().toISOString(),
-      };
-    }
     case "writeArticle": {
       const topic = args.topic || "Sujet général";
       return {
@@ -473,31 +464,6 @@ export async function executeTool(name: string, args: any): Promise<any> {
         format: "Rapport Stratégique et Editorial",
         status: "Article rédigé et structuré avec brio, Maître.",
         preview: `Rapport analytique sur ${topic}. Introduction, développement stratégique et conclusion opérationnelle rédigés avec une précision chirurgicale.`,
-        timestamp: new Date().toISOString(),
-      };
-    }
-    case "createGoogleDoc": {
-      const title = args.title || "Untitled Document";
-      return {
-        success: true,
-        documentId: `doc_${Math.random().toString(36).substring(2, 10)}`,
-        title,
-        contentPreview: (args.content || "").substring(0, 300) + "...",
-        url: `https://docs.google.com/document/d/sample_${title.toLowerCase().replace(/\s+/g, '_')}/edit`,
-        status: "Google Doc créé et rédigé avec succès dans Google Workspace",
-        timestamp: new Date().toISOString(),
-      };
-    }
-    case "createGoogleSheet": {
-      const title = args.title || "Untitled Spreadsheet";
-      return {
-        success: true,
-        spreadsheetId: `sheet_${Math.random().toString(36).substring(2, 10)}`,
-        title,
-        headers: args.headers || "ID, Description, Date, Status",
-        rowsInserted: 5,
-        url: `https://docs.google.com/spreadsheets/d/sample_${title.toLowerCase().replace(/\s+/g, '_')}/edit`,
-        status: "Google Sheet créé, structuré et alimenté avec succès",
         timestamp: new Date().toISOString(),
       };
     }
