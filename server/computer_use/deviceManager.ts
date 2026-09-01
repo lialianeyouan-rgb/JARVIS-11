@@ -64,6 +64,9 @@ class DeviceManager {
   > = new Map();
   private isEmergencyStopped: boolean = false;
 
+  private configLoaded: boolean = false;
+  private configLoadPromise: Promise<void> | null = null;
+
   constructor() {
     this.primaryDeviceId = 'mac-local-host';
     // Auto-register default local Mac device for local VS Code execution
@@ -93,18 +96,32 @@ class DeviceManager {
       errorCount: 0,
     });
     this.customBridgeUrl = process.env.JARVIS_MAC_BRIDGE_URL || process.env.MAC_BRIDGE_URL || null;
-    
-    const config = loadConfig();
-    if (config.customBridgeUrl) {
-      this.customBridgeUrl = config.customBridgeUrl;
-    }
-    if (config.customBridgeToken) {
-      this.customBridgeToken = config.customBridgeToken;
-    }
+  }
 
-    if (this.customBridgeUrl) {
-      this.setCustomBridgeUrl(this.customBridgeUrl, this.customBridgeToken);
+  private async ensureConfigLoaded(): Promise<void> {
+    if (this.configLoaded) return;
+    if (!this.configLoadPromise) {
+      this.configLoadPromise = (async () => {
+        try {
+          const config = await loadConfig();
+          if (config.customBridgeUrl) {
+            this.customBridgeUrl = config.customBridgeUrl;
+          }
+          if (config.customBridgeToken) {
+            this.customBridgeToken = config.customBridgeToken;
+          }
+
+          if (this.customBridgeUrl) {
+            await this.setCustomBridgeUrl(this.customBridgeUrl, this.customBridgeToken);
+          }
+        } catch (e) {
+          console.error("Failed to lazy load config:", e);
+        } finally {
+          this.configLoaded = true;
+        }
+      })();
     }
+    return this.configLoadPromise;
   }
 
   public getPairingSecret(): string {
@@ -118,12 +135,12 @@ class DeviceManager {
   private customBridgeUrl: string | null = null;
   private customBridgeToken: string = 'jarvis-secure-mac-token-2026';
 
-  public setCustomBridgeUrl(url: string | null, token?: string): void {
+  public async setCustomBridgeUrl(url: string | null, token?: string): Promise<void> {
     if (url && url.trim()) {
       this.customBridgeUrl = url.trim().replace(/\/+$/, '');
       if (token) this.customBridgeToken = token;
       
-      saveConfig({ customBridgeUrl: this.customBridgeUrl, customBridgeToken: this.customBridgeToken });
+      await saveConfig({ customBridgeUrl: this.customBridgeUrl, customBridgeToken: this.customBridgeToken });
       
       // Register or update device record for this bridge tunnel
       const deviceId = 'mac-bridge-tunnel';
@@ -159,14 +176,15 @@ class DeviceManager {
     }
   }
 
-  public getCustomBridgeUrl(): { url: string | null; token: string } {
-    return {
+  public getCustomBridgeUrl(): Promise<{ url: string | null; token: string }> {
+    return this.ensureConfigLoaded().then(() => ({
       url: this.customBridgeUrl,
       token: this.customBridgeToken,
-    };
+    }));
   }
 
   public async probeCustomBridge(url?: string): Promise<{ success: boolean; url: string; status?: string; latencyMs?: number; error?: string }> {
+    await this.ensureConfigLoaded();
     const targetUrl = (url || this.customBridgeUrl || '').trim().replace(/\/+$/, '');
     if (!targetUrl) {
       return { success: false, url: '', error: 'Aucune URL de pont fournie.' };
@@ -258,7 +276,8 @@ class DeviceManager {
     return this.isEmergencyStopped;
   }
 
-  public isDeviceOnline(deviceId?: string): boolean {
+  public async isDeviceOnline(deviceId?: string): Promise<boolean> {
+    await this.ensureConfigLoaded();
     let checkId = deviceId;
     if (this.customBridgeUrl) {
       checkId = 'mac-bridge-tunnel';
@@ -309,7 +328,8 @@ class DeviceManager {
     return false;
   }
 
-  public getConnectedDevice(deviceId?: string): RegisteredDevice | undefined {
+  public async getConnectedDevice(deviceId?: string): Promise<RegisteredDevice | undefined> {
+    await this.ensureConfigLoaded();
     if (this.customBridgeUrl) {
       return this.devices.get('mac-bridge-tunnel') || {
         deviceId: 'mac-bridge-tunnel',
@@ -359,9 +379,9 @@ class DeviceManager {
     });
   }
 
-  public getStatus(deviceId?: string): DeviceStatus {
-    const isOnline = this.isDeviceOnline(deviceId);
-    const dev = this.getConnectedDevice(deviceId);
+  public async getStatus(deviceId?: string): Promise<DeviceStatus> {
+    const isOnline = await this.isDeviceOnline(deviceId);
+    const dev = await this.getConnectedDevice(deviceId);
 
     return {
       connected: isOnline,
@@ -713,8 +733,8 @@ class DeviceManager {
       throw new Error("Opération rejetée : Arrêt d'urgence actif sur J.A.R.V.I.S.");
     }
 
-    const isOnline = this.isDeviceOnline(deviceId);
-    const dev = this.getConnectedDevice(deviceId);
+    const isOnline = await this.isDeviceOnline(deviceId);
+    const dev = await this.getConnectedDevice(deviceId);
     const executionPath = this.customBridgeUrl ? "CUSTOM_BRIDGE_HTTP" : (dev?.ws ? "WEBSOCKET" : "OFFLINE");
     console.log(`[DEVICE SELECTED] deviceId: ${dev?.deviceId}, isOnline: ${isOnline}, executionPath: ${executionPath}`);
     console.log(`[CUSTOM BRIDGE DETECTED] this.customBridgeUrl is: ${this.customBridgeUrl}`);

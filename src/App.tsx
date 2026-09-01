@@ -477,11 +477,11 @@ export default function App() {
         role: 'assistant',
         content: reply,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        toolTriggered: toolInfo ? {
-          tool: toolInfo.tool,
-          status: 'SUCCESS',
-          result: toolInfo.result,
-        } : undefined,
+        toolTriggered: toolInfo ? toolInfo.map(t => ({
+          tool: t.tool,
+          status: t.status,
+          result: t.result,
+        })) : undefined,
       };
 
       setChatMessages(prev => [...prev, assistantMsg]);
@@ -834,9 +834,21 @@ export default function App() {
               {/* Response Subtitle */}
               {!isListening && (
                 <div className="inline-block px-6 py-3 rounded-2xl bg-black/50 border border-amber-500/20 backdrop-blur-xl shadow-[0_0_30px_rgba(0,0,0,0.8)] transition-all">
-                  <p className="text-sm font-sans text-amber-100/90 leading-relaxed tracking-wide">
-                    {lastResponse}
-                  </p>
+                  <div className="text-sm font-sans text-amber-100/90 leading-relaxed tracking-wide">
+                    {(() => {
+                      try {
+                        const parsed = JSON.parse(lastResponse);
+                        return (
+                          <div className="space-y-1">
+                            {parsed.summary && <div className="font-bold text-amber-200">{parsed.summary}</div>}
+                            {parsed.result && <div className="text-zinc-300">{parsed.result}</div>}
+                          </div>
+                        );
+                      } catch (e) {
+                        return lastResponse;
+                      }
+                    })()}
+                  </div>
                   {isLoading && (
                     <span className="inline-block mt-1 text-[10px] text-amber-400 animate-pulse font-mono tracking-widest">
                       ● CALCUL NEURONAL EN COURS...

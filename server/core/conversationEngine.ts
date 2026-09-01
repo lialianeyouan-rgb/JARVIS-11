@@ -6,7 +6,7 @@ import { LLMResponse } from "../types";
 
 export interface ConversationResult {
   reply: string;
-  toolTriggered?: { tool: string; result: any };
+  toolTriggered?: { tool: string; result: any }[];
   metrics: any;
   modelUsed: string;
   timestamp: string;
@@ -59,72 +59,130 @@ export async function processConversation(
 
   let finalReply = llmResult.reply || "";
   
-  // Clean up JSON/Code block noise from the LLM reply
-  finalReply = finalReply
-    .replace(/```json\s*\{[\s\S]*?\}\s*```/g, "")
-    .replace(/```[\s\S]*?```/g, "")
-    .trim();
-
-  let executedToolInfo: { tool: string; result: any } | undefined = undefined;
+  let executedToolInfo: { tool: string; result: any }[] | undefined = undefined;
   let toolExecMs = 0;
   let llmFollowupMs = 0;
 
   // 3. Handle Tool Calls if requested by model
   if (llmResult.toolCalls && llmResult.toolCalls.length > 0) {
-    const call = llmResult.toolCalls[0];
-    const toolName = call.name;
-    const toolArgs = { ...(call.args || {}), ...(googleAccessToken ? { _googleAccessToken: googleAccessToken } : {}) };
-
-    console.log(`[CONVERSATION ENGINE] Executing tool call: ${toolName}`, toolArgs);
+    const calls = llmResult.toolCalls;
+    
+    // Group tool calls based on dependencies
+    const toolGroups = groupToolCalls(calls);
+    console.log(`[CONVERSATION ENGINE] Executing ${calls.length} tool calls in ${toolGroups.length} stages...`);
 
     const tBeforeTool = Date.now();
-    // Execute actual tool safely
-    let toolOutput: any;
-    try {
-      toolOutput = await executeTool(toolName, toolArgs);
-    } catch (toolErr: any) {
-      toolOutput = {
-        success: false,
-        error: toolErr.message || String(toolErr),
-        status: `Échec de l'exécution de l'outil '${toolName}' : ${toolErr.message || String(toolErr)}`,
-      };
+    const toolResults: any[] = [];
+    
+    for (const group of toolGroups) {
+        const groupPromises = group.map(async (call) => {
+            const toolName = call.name;
+            const toolArgs = { ...(call.args || {}), ...(googleAccessToken ? { _googleAccessToken: googleAccessToken } : {}) };
+            
+            try {
+                const toolOutput = await executeTool(toolName, toolArgs);
+                return { toolName, toolOutput, success: true };
+            } catch (toolErr: any) {
+                return {
+                    toolName,
+                    toolOutput: {
+                        success: false,
+                        error: toolErr.message || String(toolErr),
+                        status: `Échec de l'exécution de l'outil '${toolName}' : ${toolErr.message || String(toolErr)}`,
+                    },
+                    success: false
+                };
+            }
+        });
+        const groupResults = await Promise.all(groupPromises);
+        toolResults.push(...groupResults);
     }
+    
     const tAfterTool = Date.now();
     toolExecMs = tAfterTool - tBeforeTool;
 
-    executedToolInfo = { tool: toolName, result: toolOutput };
+    executedToolInfo = toolResults.map(r => ({ 
+      tool: r.toolName, 
+      status: r.success ? "ACTION_SUCCEEDED" : "ACTION_FAILED",
+      result: r.toolOutput 
+    }));
 
-    // Construct valid Gemini multi-turn tool response sequence with preserved thoughtSignature
+    // Construct valid Gemini multi-turn tool response sequence
     const modelTurn = llmResult.candidateContent || {
       role: "model",
-      parts: [{ functionCall: call }],
+      parts: calls.map(call => ({ functionCall: call })),
     };
 
     const toolResponseTurn = {
       role: "user",
-      parts: [{ functionResponse: { name: toolName, response: { output: toolOutput } } }],
+      parts: toolResults.map(res => ({
+        functionResponse: { name: res.toolName, response: { output: res.toolOutput } }
+      })),
     };
 
     const followupContents = [...baseContents, modelTurn, toolResponseTurn];
 
-    const tBeforeLlm2 = Date.now();
-    try {
-      // Re-invoke LLM with tool output for final synthesis
-      const followUpResult = await invokeLLM({
-        systemPrompt: JARVIS_SYSTEM_PROMPT,
-        history: [],
-        userPrompt: userPrompt,
-        rawContents: followupContents,
-        tools: jarvisToolDeclarations,
-      });
-      const tAfterLlm2 = Date.now();
-      llmFollowupMs = tAfterLlm2 - tBeforeLlm2;
+    // Check if Direct Response is possible
+    if (canDirectRespond(toolResults)) {
+      finalReply = constructDirectReply(toolResults);
+    } else {
+      const tBeforeLlm2 = Date.now();
+      try {
+        // Re-invoke LLM with tool output for final synthesis
+        const followUpResult = await invokeLLM({
+          systemPrompt: JARVIS_SYSTEM_PROMPT,
+          history: [],
+          userPrompt: userPrompt,
+          rawContents: followupContents,
+          tools: jarvisToolDeclarations,
+        });
+        const tAfterLlm2 = Date.now();
+        llmFollowupMs = tAfterLlm2 - tBeforeLlm2;
 
-      finalReply = followUpResult.reply || toolOutput.status || toolOutput.message || toolOutput.error || `Opération ${toolName} exécutée avec succès, Maître.`;
-    } catch (llmErr) {
-      finalReply = toolOutput.status || toolOutput.message || toolOutput.error || `À vos ordres, Maître. L'opération ${toolName} a été traitée.`;
+        finalReply = followUpResult.reply || "Opérations exécutées avec succès, Maître.";
+      } catch (llmErr) {
+        finalReply = `À vos ordres, Maître. Les opérations ont été traitées.`;
+      }
     }
   }
+
+  // Helper functions for dependency analysis and direct response
+  function groupToolCalls(calls: any[]) {
+      // Very simple dependency logic: if a tool needs documentId, it depends on createGoogleDoc
+      const groups: any[][] = [];
+      const createdDocs = new Set<string>();
+      
+      let currentGroup: any[] = [];
+      
+      for (const call of calls) {
+          // If tool depends on previous doc creation, it must wait
+          if (call.args && (call.args.documentId || call.args.draftId) && currentGroup.length > 0) {
+             groups.push(currentGroup);
+             currentGroup = [call];
+          } else {
+             currentGroup.push(call);
+          }
+      }
+      if (currentGroup.length > 0) groups.push(currentGroup);
+      
+      return groups;
+  }
+
+  function canDirectRespond(results: any[]) {
+      // If any tool failed, we need LLM to explain
+      if (results.some(r => !r.success)) return false;
+      // If all tools are simple creation/confirmation
+      return results.every(r => ["createGoogleDoc", "createGoogleSheet", "sendGmailDraft"].includes(r.toolName));
+  }
+
+  function constructDirectReply(results: any[]) {
+      return results.map(r => {
+         if (r.toolName === "createGoogleDoc") return `Le document "${r.toolOutput.title}" a été créé avec succès.`;
+         if (r.toolName === "createGoogleSheet") return `La feuille "${r.toolOutput.title}" a été créée avec succès.`;
+         return "Opération effectuée avec succès.";
+      }).join(" ");
+  }
+
 
   // 4. Record clean conversational turn to memory
   sessionHistory.push({

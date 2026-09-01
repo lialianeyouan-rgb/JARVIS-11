@@ -1001,7 +1001,7 @@ app.get("/api/debug-devices", (req, res) => {
   });
 });
 
-app.get("/api/jarvis/device/status", (req, res) => {
+app.get("/api/jarvis/device/status", async function(req, res) {
   try {
     // If request is from an active Mac agent sending telemetry via query or body
     const token = (req.query.token as string) || req.body?.token || (req.headers['x-device-token'] as string) || req.headers.authorization?.replace(/^Bearer\s+/i, '');
@@ -1024,7 +1024,7 @@ app.get("/api/jarvis/device/status", (req, res) => {
       });
     }
 
-    const status = deviceManager.getStatus();
+    const status = await deviceManager.getStatus();
     const devices = deviceManager.getAllDevices();
     const metrics = deviceManager.getMetrics();
     const pairingSecret = deviceManager.getPairingSecret();
@@ -1136,8 +1136,8 @@ app.post("/api/jarvis/device/pair", (req, res) => {
 });
 
 // Custom Bridge URL / Tunnel Configuration (e.g. Localhost.run, Ngrok, Cloudflare Tunnel)
-app.get("/api/jarvis/device/custom-bridge", (req, res) => {
-  const info = deviceManager.getCustomBridgeUrl();
+app.get("/api/jarvis/device/custom-bridge", async (req, res) => {
+  const info = await deviceManager.getCustomBridgeUrl();
   return res.json({ success: true, ...info });
 });
 
@@ -1145,7 +1145,7 @@ app.post("/api/jarvis/device/custom-bridge", async (req, res) => {
   try {
     const { url, token, probe = true } = req.body;
     if (url && typeof url === "string" && url.trim()) {
-      deviceManager.setCustomBridgeUrl(url, token);
+      await deviceManager.setCustomBridgeUrl(url, token);
       let probeResult = null;
       if (probe) {
         probeResult = await deviceManager.probeCustomBridge(url);
@@ -1154,13 +1154,13 @@ app.post("/api/jarvis/device/custom-bridge", async (req, res) => {
         success: true,
         customBridgeUrl: url,
         probe: probeResult,
-        status: deviceManager.getStatus(),
+        status: await deviceManager.getStatus(),
         message: probeResult?.success 
           ? `Pont distant connecté avec succès (${url}) !` 
           : `URL de pont enregistrée (${url}). ${probeResult?.error || ''}`
       });
     } else {
-      deviceManager.setCustomBridgeUrl(null);
+      await deviceManager.setCustomBridgeUrl(null);
       return res.json({ success: true, customBridgeUrl: null, message: "URL de pont personnalisée réinitialisée." });
     }
   } catch (err: any) {
@@ -1188,9 +1188,9 @@ app.post("/api/jarvis/device/emergency-stop", (req, res) => {
   });
 });
 
-app.get("/api/jarvis/device/metrics", (req, res) => {
+app.get("/api/jarvis/device/metrics", async (req, res) => {
   const metrics = deviceManager.getMetrics();
-  const status = deviceManager.getStatus();
+  const status = await deviceManager.getStatus();
   res.json({
     success: true,
     isOnline: status.connected,
@@ -1209,7 +1209,7 @@ app.get("/api/jarvis/device/metrics", (req, res) => {
 
 // E2E Verification & Integration Tests Runner (Tests A to J)
 app.get("/api/jarvis/device/test-e2e", async (req, res) => {
-  const isOnline = deviceManager.isDeviceOnline();
+  const isOnline = await deviceManager.isDeviceOnline();
   const tests: any[] = [];
 
   // TEST A: Cloud Brain Startup
@@ -1316,8 +1316,8 @@ app.get("/api/jarvis/device/test-e2e", async (req, res) => {
 
 // Mac Bridge Status & Proxy Endpoints (Compatible Layer)
 app.get("/api/jarvis/bridge/status", async (req, res) => {
-  const isOnline = deviceManager.isDeviceOnline();
-  const status = deviceManager.getStatus();
+  const isOnline = await deviceManager.isDeviceOnline();
+  const status = await deviceManager.getStatus();
   return res.json({
     connected: isOnline,
     mode: isOnline ? "PERSISTENT WSS TUNNEL (LIVE MAC HOST)" : "OFFLINE (AWAITING AGENT)",
@@ -1338,7 +1338,7 @@ app.post("/api/jarvis/bridge/exec", async (req, res) => {
     return res.status(400).json({ success: false, error: "Command is required" });
   }
 
-  if (!deviceManager.isDeviceOnline()) {
+  if (!(await deviceManager.isDeviceOnline())) {
     return res.status(503).json({
       success: false,
       live: false,

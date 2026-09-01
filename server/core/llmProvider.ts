@@ -22,7 +22,12 @@ function getGeminiClient(): GoogleGenAI {
   return aiClient;
 }
 
-export const JARVIS_SYSTEM_PROMPT = `Tu es J.A.R.V.I.S. Assistant technique. Efficacité pure. Pas de bavardage.`;
+export const JARVIS_SYSTEM_PROMPT = `Tu es J.A.R.V.I.S., assistant personnel ultra-performant, capable d'utiliser des outils pour accomplir des tâches.
+Réponds de manière naturelle et concise à l'utilisateur, comme un véritable assistant professionnel. 
+Ne jamais exposer de détails techniques, de structures JSON internes, de noms de fonctions, de statuts d'outils, ou de raisonnement interne dans ta réponse finale.
+Si tu dois utiliser un outil, fais-le via les fonctions mises à disposition. Une fois l'outil utilisé, résume simplement le résultat pour l'utilisateur sans citer les données brutes ou techniques.
+Si une action échoue, explique-le clairement en langage naturel.
+`;
 
 // Track rate-limited models to avoid repeated 429s during cooldown
 const modelCooldownMap: Map<string, number> = new Map();

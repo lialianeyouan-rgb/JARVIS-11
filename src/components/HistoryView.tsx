@@ -107,15 +107,27 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
                 </div>
 
                 <div className="whitespace-pre-wrap font-sans text-xs leading-relaxed">
-                  {msg.content}
+                  {(() => {
+                    try {
+                      const parsed = JSON.parse(msg.content);
+                      return (
+                        <div className="space-y-1">
+                          {parsed.summary && <div className="font-bold text-amber-200">{parsed.summary}</div>}
+                          {parsed.result && <div className="text-zinc-300">{parsed.result}</div>}
+                        </div>
+                      );
+                    } catch (e) {
+                      return msg.content;
+                    }
+                  })()}
                 </div>
 
-                {msg.toolTriggered && (
-                  <div className="mt-1 pt-1.5 border-t border-amber-500/10 text-[10px] text-amber-400/80 font-mono flex items-center gap-1">
+                {msg.toolTriggered && msg.toolTriggered.map((t, idx) => (
+                  <div key={idx} className="mt-1 pt-1.5 border-t border-amber-500/10 text-[10px] text-amber-400/80 font-mono flex items-center gap-1">
                     <Sparkles className="w-3 h-3 text-amber-400" />
-                    <span>Outil déclenché : {msg.toolTriggered.tool} ({msg.toolTriggered.status})</span>
+                    <span>Outil déclenché : {t.tool} ({t.status})</span>
                   </div>
-                )}
+                ))}
               </div>
             ))}
 

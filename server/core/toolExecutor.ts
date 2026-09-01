@@ -3,22 +3,76 @@ import { computerUseEngine } from "../computer_use/computerUseEngine";
 import { browserAgent } from "../computer_use/browserAgent";
 import { localBridgeClient } from "../computer_use/localBridgeClient";
 import { screenReader } from "../computer_use/screenReader";
+import { permissionEngine } from "../computer_use/permissionEngine";
 import { googleAuthService } from "./googleAuthService";
 import { postgresDatabaseEngine } from "./databaseEngine";
 import { ToolResult } from "../types";
 
+// Structure de vérification
+interface VerificationResult {
+  verified: boolean;
+  details: string;
+}
+
+// Wrapper pour fiabiliser les actions
+async function executeAndVerify<T>(
+  action: () => Promise<T>,
+  verifyFn: (result: T) => Promise<VerificationResult>
+): Promise<{ result: T; verification: VerificationResult }> {
+  const result = await action();
+  
+  try {
+    const verification = await verifyFn(result);
+    return { result, verification };
+  } catch (error) {
+    return { result, verification: { verified: false, details: (error as Error).message } };
+  }
+}
+
+function normalizeToolData(toolName: string, data: any): any {
+    // Normalize Gmail results to reduce token usage
+    if (toolName === "listGmailMessages" && data.messages) {
+        return { messages: data.messages.map((m: any) => ({
+            id: m.id,
+            snippet: m.snippet?.substring(0, 60) || "",
+            subject: m.subject,
+            from: m.from
+        })) };
+    }
+    // Normalize Drive results to reduce token usage
+    if (toolName === "listGoogleDriveFiles" && data.files) {
+        return { files: data.files.map((f: any) => ({
+            id: f.id,
+            name: f.name,
+            mimeType: f.mimeType
+        })) };
+    }
+    return data;
+}
+
 function createToolResult(toolName: string, status: ToolResult['status'], data?: any, error?: string, message?: string): ToolResult {
+    const normalizedData = data ? normalizeToolData(toolName, data) : data;
     const result: ToolResult = {
         toolName,
         status,
         success: status === "ACTION_SUCCEEDED",
-        data,
+        data: normalizedData,
         error,
         message,
         timestamp: new Date().toISOString()
     };
     console.log(`[AUDIT LOG] ${JSON.stringify(result)}`);
     return result;
+}
+
+function validateToolResult(result: any, toolName: string): ToolResult {
+    if (!result || typeof result !== 'object') {
+        return createToolResult(toolName, "ACTION_FAILED", undefined, "Invalid response format from tool");
+    }
+    if (result.success === false) {
+         return createToolResult(toolName, "ACTION_FAILED", result.data, result.error || result.message);
+    }
+    return createToolResult(toolName, "ACTION_SUCCEEDED", result.data || result, undefined, result.message || "Action completed successfully");
 }
 
 // In-memory store for real drafts and communications lifecycle
@@ -257,14 +311,15 @@ export async function executeTool(name: string, args: any): Promise<any> {
         return { success: false, error: "Destinataire, sujet et corps du message requis." };
       }
 
-      // High risk action protection: require explicit confirmation
-      if (!confirmed) {
+      // INTEGRATION PERMISSION ENGINE
+      const evaluation = permissionEngine.evaluateAction('typeText', { text: `send email to ${recipient}` });
+      if (evaluation.requiresConfirmation && !confirmed) {
         return {
           success: false,
           requiresConfirmation: true,
           riskLevel: "HIGH",
           status: "ACTION_REQUIRES_CONFIRMATION",
-          message: `L'envoi d'e-mail à ${recipient} est classé comme action à haut risque. Veuillez confirmer explicitement l'envoi.`,
+          message: `L'envoi d'e-mail à ${recipient} est classé comme action à haut risque: ${evaluation.reason}. Veuillez confirmer explicitement l'envoi.`,
           timestamp: new Date().toISOString()
         };
       }
@@ -857,7 +912,7 @@ export async function executeTool(name: string, args: any): Promise<any> {
     case "listGoogleDriveFiles": {
       const fallbackToken = (args && args._googleAccessToken) || process.env.GOOGLE_ACCESS_TOKEN || "";
       try {
-        return await googleAuthService.executeWithGoogleApi("listGoogleDriveFiles", async (token) => {
+        const res = await googleAuthService.executeWithGoogleApi("listGoogleDriveFiles", async (token) => {
           const pageSize = args.pageSize || 15;
           let q = "trashed = false";
           if (args.folderId) q += ` and '${args.folderId}' in parents`;
@@ -871,26 +926,23 @@ export async function executeTool(name: string, args: any): Promise<any> {
               success: true,
               files: data.files || [],
               count: (data.files || []).length,
-              status: `${(data.files || []).length} fichiers et dossiers récupérés depuis Google Drive.`
+              message: `${(data.files || []).length} fichiers et dossiers récupérés depuis Google Drive.`
             };
           }
           const errText = await res.text();
           if (res.status === 401) throw new Error(`401 Unauthorized: ${errText}`);
           return { success: false, error: `Erreur Drive API: ${errText}` };
         }, fallbackToken);
+        
+        return validateToolResult(res, "listGoogleDriveFiles");
       } catch (err: any) {
-        return {
-          success: false,
-          error: err.message?.includes("GOOGLE_OAUTH_REAUTH_REQUIRED")
-            ? "GOOGLE_OAUTH_REAUTH_REQUIRED: Connexion Google requise."
-            : `Erreur Drive API: ${err.message}`
-        };
+        return createToolResult("listGoogleDriveFiles", "ACTION_FAILED", undefined, err.message);
       }
     }
     case "createGoogleDriveFolder": {
       const fallbackToken = (args && args._googleAccessToken) || process.env.GOOGLE_ACCESS_TOKEN || "";
       try {
-        return await googleAuthService.executeWithGoogleApi("createGoogleDriveFolder", async (token) => {
+        const res = await googleAuthService.executeWithGoogleApi("createGoogleDriveFolder", async (token) => {
           const metadata: any = {
             name: args.folderName,
             mimeType: "application/vnd.google-apps.folder"
@@ -910,15 +962,17 @@ export async function executeTool(name: string, args: any): Promise<any> {
             return {
               success: true,
               folder,
-              status: `Dossier Google Drive "${args.folderName}" créé avec succès.`
+              message: `Dossier Google Drive "${args.folderName}" créé avec succès.`
             };
           }
           const errText = await res.text();
           if (res.status === 401) throw new Error(`401 Unauthorized: ${errText}`);
           return { success: false, error: `Erreur création dossier: ${errText}` };
         }, fallbackToken);
+        
+        return validateToolResult(res, "createGoogleDriveFolder");
       } catch (err: any) {
-        return { success: false, error: err.message };
+        return createToolResult("createGoogleDriveFolder", "ACTION_FAILED", undefined, err.message);
       }
     }
     case "deleteGoogleDriveFile": {
@@ -1112,13 +1166,23 @@ export async function executeTool(name: string, args: any): Promise<any> {
                   requests: [{ insertText: { location: { index: 1 }, text: args.content } }]
                 })
               });
+              
+              // Verification Step
+              const getRes = await fetch(`https://docs.googleapis.com/v1/documents/${doc.documentId}`, {
+                headers: { Authorization: `Bearer ${token}` }
+              });
+              const docData = await getRes.json();
+              const bodyText = docData.body.content.map((c: any) => c.paragraph?.elements?.map((e: any) => e.textRun?.content).join('')).join('');
+              if (!bodyText.includes(args.content.substring(0, 10))) {
+                  return { success: false, error: "Document créé mais le contenu n'a pas pu être vérifié." };
+              }
             }
             return {
               success: true,
               documentId: doc.documentId,
               title: args.title,
               webViewLink: `https://docs.google.com/document/d/${doc.documentId}/edit`,
-              status: `Google Doc "${args.title}" créé avec succès.`
+              status: `Google Doc "${args.title}" créé et vérifié avec succès.`
             };
           }
           const errText = await createRes.text();

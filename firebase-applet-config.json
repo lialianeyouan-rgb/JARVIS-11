@@ -3,6 +3,7 @@
   "appId": "1:892240354100:web:7e667ef0c27ca9b164e361",
   "apiKey": "AIzaSyAeNCOMF3BTEtJVphYpje8DwTpL1-7LTac",
   "authDomain": "lucky-terra-dpnh2.firebaseapp.com",
+  "firestoreDatabaseId": "ai-studio-projectjarvis-646df9ba-6312-4a19-bbc5-0c291c49ff89",
   "storageBucket": "lucky-terra-dpnh2.firebasestorage.app",
   "messagingSenderId": "892240354100",
   "measurementId": "",

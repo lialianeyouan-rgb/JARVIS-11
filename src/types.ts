@@ -101,7 +101,7 @@ export interface ChatMessage {
     tool: string;
     status: string;
     result?: any;
-  };
+  }[];
 }
 
 export interface MemoryItem {
