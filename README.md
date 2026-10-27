@@ -1,43 +1,43 @@
 # J.A.R.V.I.S. (Just A Rather Very Intelligent System)
 
-J.A.R.V.I.S. est un assistant personnel intelligent conçu pour centraliser et automatiser la gestion de votre écosystème numérique personnel (Google Workspace) via une interface moderne et sécurisée.
+J.A.R.V.I.S. is an intelligent personal assistant designed to centralize and automate the management of your personal digital ecosystem (Google Workspace) through a modern, secure interface.
 
-## 🚀 Fonctionnalités & Logique Métier
+## Functionalities & Business Logic
 
-| Fonctionnalité | Pourquoi cette approche ? |
+| Functionality | Why this approach? |
 | :--- | :--- |
-| **Gestion Gmail/Agenda/Drive** | Centraliser les données éparpillées pour une vue d'ensemble rapide. |
-| **Diagnostic Système** | Permettre une auto-surveillance des connexions pour minimiser le temps d'arrêt. |
-| **Architecture Firebase** | Assurer la persistance des données multi-appareils et la sécurité native des accès. |
+| **Gmail/Calendar/Drive Management** | Centralize scattered data for a quick, comprehensive overview. |
+| **System Diagnostics** | Enable self-monitoring of service connections to minimize downtime. |
+| **Firebase Architecture** | Ensure cross-device data persistence and native access security. |
 
-## 🛠 Explication des Technologies & Langages
+## Technology & Language Explanations
 
-- **React & Vite** : Utilisés pour construire une interface utilisateur rapide, modulaire et réactive (Single Page Application).
-- **TypeScript** : Choisi pour la sécurité du typage, essentielle dans un projet manipulant des données sensibles (emails, calendriers).
-- **Tailwind CSS** : Permet un design rapide, propre et responsive sans alourdir le projet avec des fichiers CSS complexes.
-- **Firebase Admin SDK (Node.js)** : La colonne vertébrale pour gérer les accès sécurisés aux données côté serveur.
-- **Google Cloud APIs** : Le moteur qui permet d'interagir avec les services Google (Gmail, Drive, etc.).
+- **React & Vite** : Used to build a fast, modular, and reactive user interface (Single Page Application).
+- **TypeScript** : Chosen for type safety, which is essential in a project handling sensitive data (emails, calendars).
+- **Tailwind CSS** : Allows for fast, clean, and responsive design without cluttering the project with complex CSS files.
+- **Firebase Admin SDK (Node.js)** : The backbone for managing secure server-side data access.
+- **Google Cloud APIs** : The engine enabling interaction with Google services (Gmail, Drive, etc.).
 
-## ⚠️ Analyse des Défis & Erreurs Rencontrées
+## Analysis of Challenges & Errors Encountered
 
-Au cours du développement, nous avons dû surmonter plusieurs défis techniques :
+During development, we overcame several technical challenges:
 
-1.  **Erreurs de Permissions (PERMISSION_DENIED)** : 
-    *   *Cause* : Souvent dues à une mauvaise configuration des rôles dans la console Google Cloud ou à des APIs non activées (ex: Google Drive API).
-    *   *Correction* : Vérification des scopes OAuth et activation explicite des APIs dans la console GCP.
-2.  **Gestion des Objets complexes dans l'UI** :
-    *   *Cause* : Tentative d'affichage direct d'objets JSON complexes dans le DOM React.
-    *   *Correction* : Sécurisation de l'affichage avec `typeof` et `JSON.stringify` pour convertir les logs techniques en chaînes de texte.
-3.  **Connexions Firebase Instables** :
-    *   *Cause* : Problèmes de persistance des connexions lors du cycle de vie du serveur de développement.
-    *   *Correction* : Implémentation d'un redémarrage propre du serveur et réinitialisation des accès Firebase.
+1. **Permission Errors (PERMISSION_DENIED)** :
+    - *Cause* : Often due to incorrect role configuration in the Google Cloud Console or disabled APIs (e.g., Google Drive API).
+    - *Correction* : Verification of OAuth scopes and explicit activation of APIs in the GCP Console.
+2. **Complex Object Rendering in UI** :
+    - *Cause* : Attempting to directly render complex JSON objects in the React DOM.
+    - *Correction* : Securing rendering using `typeof` and `JSON.stringify` to convert technical logs into readable text strings.
+3. **Unstable Firebase Connections** :
+    - *Cause* : Connection persistence issues during the development server lifecycle.
+    - *Correction* : Implementation of a clean server restart and resetting Firebase access credentials.
 
-## 🗺 Roadmap
+## Roadmap
 
-- **v0.x** : Stabilisation, sécurisation et gestion des logs.
-- **v1.0** : Interface fluide pour Gmail/Agenda/Drive et Dashboard de santé.
-- **v2.0** : Réponses intelligentes (Gemini API) et recherche sémantique.
-- **v3.0** : Système de plugins et support multi-utilisateurs.
+- **v0.x (Current Phase)** : Stabilization, access security, and log management.
+- **v1.0** : Fluid interface for Gmail/Calendar/Drive and System Health Dashboard.
+- **v2.0** : Intelligent email responses (Gemini API) and semantic search for Drive.
+- **v3.0** : Plugin system, multi-user support, and advanced preferences.
 
 ---
-*Projet développé pour une automatisation personnelle intelligente.*
+*Project developed for intelligent personal automation.*
