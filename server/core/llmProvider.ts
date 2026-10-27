@@ -262,8 +262,9 @@ export async function invokeLLM(context: ConversationContext, preferredModel?: s
 
   // Active official Gemini models supported in this environment
   const defaultModels = [
-    "gemini-3.7-flash",
     "gemini-3.1-flash-lite",
+    "gemini-2.0-flash",
+    "gemini-3.7-flash",
   ];
 
   const orderedCandidates = preferredModel && defaultModels.includes(preferredModel)
@@ -323,6 +324,9 @@ export async function invokeLLM(context: ConversationContext, preferredModel?: s
       if (retryMatch && retryMatch[1]) {
         cooldownDuration = Math.ceil(parseFloat(retryMatch[1]) * 1000) + 1000;
       }
+      
+      // Add jitter to cooldown (randomize +/- 10%)
+      cooldownDuration = cooldownDuration + (Math.random() * 6000 - 3000);
 
       // If it's a quota, rate-limit, overload or transient error, put model in cooldown and try next model
       if (
@@ -335,7 +339,7 @@ export async function invokeLLM(context: ConversationContext, preferredModel?: s
         errMsg.includes('500') ||
         errMsg.includes('INTERNAL')
       ) {
-        console.warn(`[GEMINI LLM] Model ${modelName} temporary limit reached (${errMsg.slice(0, 120)}...). Cooling down for ${cooldownDuration}ms and trying next candidate.`);
+        console.warn(`[GEMINI LLM] Model ${modelName} temporary limit reached (${errMsg.slice(0, 120)}...). Cooling down for ${Math.round(cooldownDuration)}ms and trying next candidate.`);
         modelCooldownMap.set(modelName, Date.now() + cooldownDuration);
         continue;
       }

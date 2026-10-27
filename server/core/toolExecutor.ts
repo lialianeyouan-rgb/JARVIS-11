@@ -1237,6 +1237,34 @@ export async function executeTool(name: string, args: any): Promise<any> {
         return { success: false, error: err.message };
       }
     }
+    case "listGoogleContacts": {
+      const fallbackToken = (args && args._googleAccessToken) || process.env.GOOGLE_ACCESS_TOKEN || "";
+      try {
+        return await googleAuthService.executeWithGoogleApi("listGoogleContacts", async (token) => {
+          const maxResults = args.maxResults || 20;
+          const url = `https://people.googleapis.com/v1/people/me/connections?personFields=names,emailAddresses&pageSize=${maxResults}`;
+          const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+          if (res.ok) {
+            const data = await res.json();
+            const contacts = (data.connections || []).map((c: any) => ({
+              name: c.names?.[0]?.displayName || "Inconnu",
+              email: c.emailAddresses?.[0]?.value || "Pas d'email",
+            }));
+            return {
+              success: true,
+              contacts,
+              count: contacts.length,
+              status: `${contacts.length} contacts récupérés.`
+            };
+          }
+          const errText = await res.text();
+          if (res.status === 401) throw new Error(`401 Unauthorized: ${errText}`);
+          return { success: false, error: `Erreur People API: ${errText}` };
+        }, fallbackToken);
+      } catch (err: any) {
+        return createToolResult("listGoogleContacts", "ACTION_FAILED", undefined, err.message);
+      }
+    }
       default:
         return {
           success: false,

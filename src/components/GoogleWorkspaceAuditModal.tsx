@@ -176,6 +176,14 @@ export const GoogleWorkspaceAuditModal: React.FC<GoogleWorkspaceAuditModalProps>
   const isConnected = auditReport?.tokenProvided || lifecycleStatus?.authenticated;
   const hasRefreshToken = lifecycleStatus?.hasRefreshToken;
   const expiresInSeconds = lifecycleStatus?.expiresInSeconds;
+  
+  console.log('DEBUG: GoogleWorkspaceAuditModal rendering', {
+    auditReport,
+    lifecycleStatus,
+    isConnected,
+    hasRefreshToken,
+    expiresInSeconds
+  });
 
   return (
     <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 font-mono text-amber-100">
@@ -560,7 +568,7 @@ export const GoogleWorkspaceAuditModal: React.FC<GoogleWorkspaceAuditModalProps>
                           [{log.event}]
                         </span>
                         <span className="text-zinc-300 break-all">
-                          {log.details || JSON.stringify(log.meta || {})}
+                          {typeof log.details === 'string' ? log.details : JSON.stringify(log.details || log.meta || {})}
                         </span>
                       </div>
                     );

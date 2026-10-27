@@ -47,13 +47,24 @@ export async function processConversation(
 
   const tBeforeLlm1 = Date.now();
   // 2. Invoke LLM with structured history
-  const llmResult = await invokeLLM({
+  let llmResult = await invokeLLM({
     systemPrompt: JARVIS_SYSTEM_PROMPT,
     history: sessionHistory,
     userPrompt,
     rawContents: baseContents,
     tools: jarvisToolDeclarations,
   });
+
+  // Force tool use for personal data requests if none were triggered
+  if (isDataRequest(userPrompt) && (!llmResult.toolCalls || llmResult.toolCalls.length === 0)) {
+     llmResult = await invokeLLM({
+       systemPrompt: JARVIS_SYSTEM_PROMPT + "\n\nCRITICAL: User is asking for personal data. YOU MUST USE A TOOL. Do NOT simulate or guess.",
+       history: sessionHistory,
+       userPrompt,
+       rawContents: baseContents,
+       tools: jarvisToolDeclarations,
+     });
+  }
   const tAfterLlm1 = Date.now();
   const llmFirstMs = tAfterLlm1 - tBeforeLlm1;
 
@@ -146,7 +157,12 @@ export async function processConversation(
     }
   }
 
-  // Helper functions for dependency analysis and direct response
+  // Helper functions
+  function isDataRequest(prompt: string): boolean {
+    const p = prompt.toLowerCase();
+    return p.includes("contact") || p.includes("email") || p.includes("discussion") || p.includes("discuter") || p.includes("personne") || p.includes("qui") || p.includes("doc") || p.includes("fit");
+  }
+
   function groupToolCalls(calls: any[]) {
       // Very simple dependency logic: if a tool needs documentId, it depends on createGoogleDoc
       const groups: any[][] = [];

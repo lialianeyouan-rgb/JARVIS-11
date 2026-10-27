@@ -31,7 +31,7 @@ export const VOICE_PRESETS: VoicePreset[] = [
     gender: 'masculine',
     characteristic: 'grave',
     rate: 0.90,
-    pitch: 0.50,
+    pitch: 0.75,
     icon: 'Radio',
   },
   {

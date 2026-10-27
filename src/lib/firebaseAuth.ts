@@ -26,6 +26,7 @@ export const SCOPES = [
   'https://www.googleapis.com/auth/gmail.modify',
   'https://www.googleapis.com/auth/documents',
   'https://www.googleapis.com/auth/spreadsheets',
+  'https://www.googleapis.com/auth/contacts.readonly',
 ];
 
 const provider = new GoogleAuthProvider();

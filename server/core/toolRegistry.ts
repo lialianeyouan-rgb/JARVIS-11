@@ -418,13 +418,14 @@ export const jarvisToolDeclarations: any[] = [
   },
 
   {
-    name: "listDriveFiles",
-    description: "List files in Google Drive.",
+    name: "listGoogleContacts",
+    description: "List the user's Google Contacts with name and email addresses.",
     parameters: {
       type: "OBJECT",
       properties: {
-        query: { type: "STRING", description: "Search query" },
+        maxResults: { type: "NUMBER", description: "Max contacts to list (default 20)" },
       },
+      required: [],
     },
   },
   {
